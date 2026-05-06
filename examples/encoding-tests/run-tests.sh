@@ -126,6 +126,34 @@ assert_idempotent "utf8-acentos.txt"
 assert_idempotent "cp1252-acentos.txt"
 assert_idempotent "ascii-puro.txt"
 
-# Cases will be added in Task 7
-echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
+echo ""
+echo "=== End-to-end process_file ==="
+run_case "01 ascii puro"          "01-ascii-puro.prw"        "us-ascii"
+run_case "02 acentos PT-BR"       "02-acentos-ptbr.prw"      "iso-8859-1"
+run_case "03 translit symbols"    "03-translit-symbols.prw"  "iso-8859-1"
+# 04 emoji: file should remain as-is (utf-8) because conversion fails
+echo "[04 emoji-fail]"
+{
+  tmp="$TMP_DIR/04-emoji-fail.prw"
+  cp "$FIXTURES_DIR/04-emoji-fail.prw" "$tmp"
+  bash "$LIB" process_file "$tmp" 2>/dev/null
+  enc=$(detect_charset "$tmp")
+  if [ "$enc" = "utf-8" ]; then pass "04 emoji preserved as utf-8 on failure"; else fail "04 emoji enc=$enc (expected utf-8 because translit must fail)"; fi
+}
+run_case "05 already cp1252"      "05-already-cp1252.prw"    "iso-8859-1"
+run_case "06 utf8 with BOM"       "06-utf8-bom.prw"          "iso-8859-1"
+# 07: not advpl extension -> no-op, stays utf-8
+echo "[07 not-advpl]"
+{
+  tmp="$TMP_DIR/07-not-advpl.txt"
+  cp "$FIXTURES_DIR/07-not-advpl.txt" "$tmp"
+  bash "$LIB" process_file "$tmp"
+  enc=$(detect_charset "$tmp")
+  if [ "$enc" = "utf-8" ]; then pass "07 not-advpl preserved (filter)"; else fail "07 not-advpl enc=$enc (expected utf-8)"; fi
+}
+run_case "08 tlpp class"          "08-tlpp-class.tlpp"       "iso-8859-1"
+
+echo ""
+echo "============================="
+echo "TOTAL: PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

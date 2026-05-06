@@ -1,0 +1,9 @@
+#include "tlpp-core.th"
+namespace custom.encoding.test
+class TestEnc
+  public method new() as object
+endclass
+method new() class TestEnc
+  // Comentário com acentuação
+  return self
+endmethod
