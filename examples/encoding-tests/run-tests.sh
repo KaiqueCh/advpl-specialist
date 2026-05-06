@@ -57,6 +57,18 @@ assert_utf8 "utf8 with acentos"   "utf8-acentos.txt"   0
 assert_utf8 "cp1252 with acentos" "cp1252-acentos.txt" 1
 assert_utf8 "pure ascii"          "ascii-puro.txt"     0
 
+assert_bom_stripped() {
+  local fixture="$1"
+  local tmp="$TMP_DIR/strip-$(basename "$fixture")"
+  cp "$FIXTURES_DIR/$fixture" "$tmp"
+  bash "$LIB" strip_bom "$tmp"
+  local first3
+  first3=$(head -c 3 "$tmp" | od -An -tx1 | tr -d ' \n')
+  if [ "$first3" != "efbbbf" ]; then pass "strip_bom: removed from $fixture"; else fail "strip_bom: BOM still present in $fixture"; fi
+}
+
+assert_bom_stripped "utf8-bom.txt"
+
 # Cases will be added in Task 7
 echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
