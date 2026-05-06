@@ -69,6 +69,38 @@ assert_bom_stripped() {
 
 assert_bom_stripped "utf8-bom.txt"
 
+assert_converts_to_cp1252() {
+  local label="$1" fixture="$2"
+  local tmp="$TMP_DIR/conv-$(basename "$fixture")"
+  cp "$FIXTURES_DIR/$fixture" "$tmp"
+  bash "$LIB" convert_to_cp1252 "$tmp" 2>/dev/null
+  local rc=$?
+  if [ "$rc" = 0 ]; then
+    local enc
+    enc=$(file -bI "$tmp" 2>/dev/null | sed -n 's/.*charset=\([^[:space:];]*\).*/\1/p')
+    if [ "$enc" = "iso-8859-1" ] || [ "$enc" = "us-ascii" ]; then
+      pass "convert: $label → $enc"
+    else
+      fail "convert: $label encoding=$enc"
+    fi
+  else
+    fail "convert: $label rc=$rc"
+  fi
+}
+
+assert_convert_fails() {
+  local label="$1" fixture="$2"
+  local tmp="$TMP_DIR/conv-fail-$(basename "$fixture")"
+  cp "$FIXTURES_DIR/$fixture" "$tmp"
+  bash "$LIB" convert_to_cp1252 "$tmp" 2>/dev/null
+  local rc=$?
+  if [ "$rc" != 0 ]; then pass "convert: $label correctly failed"; else fail "convert: $label should have failed"; fi
+}
+
+assert_converts_to_cp1252 "acentos PT-BR"  "utf8-acentos.txt"
+assert_converts_to_cp1252 "ascii puro"     "ascii-puro.txt"
+assert_convert_fails      "incompatible"   "utf8-emoji.txt"
+
 # Cases will be added in Task 7
 echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

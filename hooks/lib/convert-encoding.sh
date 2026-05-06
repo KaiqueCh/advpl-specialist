@@ -29,6 +29,19 @@ strip_bom() {
   fi
 }
 
+convert_to_cp1252() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  local tmp="$path.tmp.$$"
+  if iconv -f UTF-8 -t WINDOWS-1252//TRANSLIT "$path" > "$tmp" 2>/dev/null; then
+    mv "$tmp" "$path"
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "advpl-specialist: cannot convert (incompatible chars): $path" >&2
+  return 1
+}
+
 # Allow standalone invocation: bash convert-encoding.sh <function> <args...>
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   fn="${1:-}"
