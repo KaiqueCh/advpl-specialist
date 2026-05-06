@@ -42,6 +42,27 @@ convert_to_cp1252() {
   return 1
 }
 
+_check_iconv() {
+  if ! command -v iconv >/dev/null 2>&1; then
+    if [ "${ADVPL_ENCODING_WARNED:-0}" != "1" ]; then
+      echo "advpl-specialist: 'iconv' not found in PATH; encoding conversion disabled" >&2
+      export ADVPL_ENCODING_WARNED=1
+    fi
+    return 1
+  fi
+  return 0
+}
+
+process_file() {
+  local path="$1"
+  [ -f "$path" ] || return 0
+  is_advpl_file "$path" || return 0
+  _check_iconv || return 0
+  is_utf8 "$path" || return 0
+  strip_bom "$path"
+  convert_to_cp1252 "$path"
+}
+
 # Allow standalone invocation: bash convert-encoding.sh <function> <args...>
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   fn="${1:-}"

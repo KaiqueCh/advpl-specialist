@@ -111,6 +111,21 @@ assert_converts_to_cp1252 "acentos PT-BR"  "utf8-acentos.txt"
 assert_converts_to_cp1252 "ascii puro"     "ascii-puro.txt"
 assert_convert_fails      "incompatible"   "utf8-emoji.txt"
 
+assert_idempotent() {
+  local fixture="$1"
+  local tmp="$TMP_DIR/idemp-$(basename "$fixture")"
+  cp "$FIXTURES_DIR/$fixture" "$tmp"
+  bash "$LIB" process_file "$tmp"
+  local hash1; hash1=$(shasum "$tmp" | awk '{print $1}')
+  bash "$LIB" process_file "$tmp"
+  local hash2; hash2=$(shasum "$tmp" | awk '{print $1}')
+  if [ "$hash1" = "$hash2" ]; then pass "idempotent: $fixture"; else fail "idempotent: $fixture changed on 2nd run"; fi
+}
+
+assert_idempotent "utf8-acentos.txt"
+assert_idempotent "cp1252-acentos.txt"
+assert_idempotent "ascii-puro.txt"
+
 # Cases will be added in Task 7
 echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
