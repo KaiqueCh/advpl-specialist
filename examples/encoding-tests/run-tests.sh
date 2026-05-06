@@ -31,6 +31,21 @@ run_case() {
   fi
 }
 
+assert_extension() {
+  local label="$1" path="$2" expected="$3"
+  bash "$LIB" is_advpl_file "$path"
+  local rc=$?
+  if [ "$rc" = "$expected" ]; then pass "extension: $label"; else fail "extension: $label rc=$rc expected=$expected"; fi
+}
+
+# Extension filter unit tests
+assert_extension "MATA461.prw"      "MATA461.prw"      0
+assert_extension "lower.tlpp"       "Service.tlpp"     0
+assert_extension "uppercase .PRW"   "FOO.PRW"          0
+assert_extension "include .ch"      "include.ch"       0
+assert_extension "rejects .txt"     "readme.txt"       1
+assert_extension "rejects no-ext"   "Makefile"         1
+
 # Cases will be added in Task 7
 echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
