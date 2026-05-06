@@ -8,6 +8,15 @@ Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
 O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-05-06
+
+### Adicionado
+
+- Conversao automatica UTF-8 → CP1252 (Windows-1252) para arquivos ADVPL/TLPP escritos ou editados pelo plugin, via hook `PostToolUse` em `Write|Edit|MultiEdit`. Cobre `.prw`, `.tlpp`, `.prx`, `.ch`, `.prg`, `.apw`, `.aph`, `.tlh`. Conversao usa `iconv` com `WINDOWS-1252//TRANSLIT` (ex: `→` vira `->`); caracteres incompativeis (emojis, kanji) geram warning no stderr e o arquivo permanece UTF-8 — o hook nunca bloqueia o fluxo do Claude. Remove BOM UTF-8 quando presente. Idempotente (rodar de novo em arquivo CP1252 e no-op). Requer `iconv` no PATH (nativo em macOS, Linux, WSL, Git Bash).
+- Nova lib de encoding `hooks/lib/convert-encoding.sh` com cinco funcoes publicas (`is_advpl_file`, `is_utf8`, `strip_bom`, `convert_to_cp1252`, `process_file`) e gravacao atomica (tmp + mv) para seguranca.
+- Entrypoint do hook `hooks/post-tool-use-encoding` que extrai `tool_input.file_path` do payload JSON do harness (jq com fallback para sed) e delega para a lib.
+- Runner de testes baseado em fixtures `examples/encoding-tests/run-tests.sh` standalone com 24 asserts cobrindo 8 cenarios (ASCII, acentos PT-BR, simbolos com translit, caracteres incompativeis, ja CP1252, UTF-8 com BOM, extensao nao-ADVPL, classe TLPP), mais deteccao portavel de charset (`file -bI` para macOS / `file -bi` para Linux).
+
 ## [1.1.2] - 2026-04-18
 
 ### Adicionado

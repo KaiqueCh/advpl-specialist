@@ -6,6 +6,18 @@ Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-05-06
+
+### Added / Adicionado
+- Automatic UTF-8 → CP1252 (Windows-1252) conversion for ADVPL/TLPP files written or edited by the plugin, via a `PostToolUse` hook on `Write|Edit|MultiEdit`. Covers `.prw`, `.tlpp`, `.prx`, `.ch`, `.prg`, `.apw`, `.aph`, `.tlh`. Conversion uses `iconv` with `WINDOWS-1252//TRANSLIT` (e.g. `→` becomes `->`); incompatible characters (emojis, kanji) trigger a stderr warning and the file remains UTF-8 — the hook never blocks the Claude flow. Removes UTF-8 BOM when present. Idempotent (re-running on a CP1252 file is a no-op). Requires `iconv` in PATH (native on macOS, Linux, WSL, Git Bash).
+- Conversao automatica UTF-8 → CP1252 (Windows-1252) para arquivos ADVPL/TLPP escritos ou editados pelo plugin, via hook `PostToolUse` em `Write|Edit|MultiEdit`. Cobre `.prw`, `.tlpp`, `.prx`, `.ch`, `.prg`, `.apw`, `.aph`, `.tlh`. Conversao usa `iconv` com `WINDOWS-1252//TRANSLIT` (ex: `→` vira `->`); caracteres incompativeis (emojis, kanji) geram warning no stderr e o arquivo permanece UTF-8 — o hook nunca bloqueia o fluxo do Claude. Remove BOM UTF-8 quando presente. Idempotente (rodar de novo em arquivo CP1252 e no-op). Requer `iconv` no PATH (nativo em macOS, Linux, WSL, Git Bash).
+- New encoding library `hooks/lib/convert-encoding.sh` with five public functions (`is_advpl_file`, `is_utf8`, `strip_bom`, `convert_to_cp1252`, `process_file`) and atomic write (tmp + mv) for safety.
+- Nova lib de encoding `hooks/lib/convert-encoding.sh` com cinco funcoes publicas (`is_advpl_file`, `is_utf8`, `strip_bom`, `convert_to_cp1252`, `process_file`) e gravacao atomica (tmp + mv) para seguranca.
+- Hook entrypoint `hooks/post-tool-use-encoding` that extracts `tool_input.file_path` from the harness JSON payload (jq with sed fallback) and delegates to the lib.
+- Entrypoint do hook `hooks/post-tool-use-encoding` que extrai `tool_input.file_path` do payload JSON do harness (jq com fallback para sed) e delega para a lib.
+- Standalone fixture-based test runner `examples/encoding-tests/run-tests.sh` with 24 assertions covering 8 fixture scenarios (ASCII, PT-BR accents, translit symbols, incompatible chars, already-CP1252, UTF-8 with BOM, non-ADVPL extensions, TLPP class), plus portable charset detection (`file -bI` for macOS / `file -bi` for Linux).
+- Runner de testes baseado em fixtures `examples/encoding-tests/run-tests.sh` standalone com 24 asserts cobrindo 8 cenarios (ASCII, acentos PT-BR, simbolos com translit, caracteres incompativeis, ja CP1252, UTF-8 com BOM, extensao nao-ADVPL, classe TLPP), mais deteccao portavel de charset (`file -bI` para macOS / `file -bi` para Linux).
+
 ## [1.1.2] - 2026-04-18
 
 ### Added / Adicionado

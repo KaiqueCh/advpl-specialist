@@ -1,6 +1,6 @@
 # advpl-specialist
 
-![Version](https://img.shields.io/badge/version-1.1.2-blue)
+![Version](https://img.shields.io/badge/version-1.1.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Claude%20Code-blueviolet)
 ![TOTVS](https://img.shields.io/badge/TOTVS-Protheus-orange)
@@ -57,6 +57,7 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 - **Refatoracao** - Sugestoes de melhoria de estrutura com 6 padroes (RF-001 a RF-006)
 - **Documentacao automatica** - Cabecalho Protheus.doc, documentacao completa e documentacao de API
 - **Changelog** - Geracao de changelog a partir do git diff com classificacao de impacto
+- **Conversao automatica para CP1252** - Todo arquivo ADVPL/TLPP (`.prw`, `.tlpp`, `.prx`, `.ch`, `.prg`, `.apw`, `.aph`, `.tlh`) escrito ou editado pelo plugin e automaticamente convertido para Windows-1252 (CP1252), encoding esperado pelo TOTVS Protheus. Caracteres incompativeis (ex: emojis, kanji) geram um warning visivel e o arquivo permanece em UTF-8 — o plugin nunca bloqueia o fluxo. Requer `iconv` no PATH (presente nativamente em macOS, Linux, WSL e Git Bash).
 
 ### Para Consultores Funcionais
 
