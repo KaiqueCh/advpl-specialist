@@ -11,6 +11,12 @@ is_advpl_file() {
   [[ "$lower" =~ $ADVPL_EXTENSIONS_REGEX ]]
 }
 
+is_utf8() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  iconv -f UTF-8 -t UTF-8 < "$path" > /dev/null 2>&1
+}
+
 # Allow standalone invocation: bash convert-encoding.sh <function> <args...>
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   fn="${1:-}"

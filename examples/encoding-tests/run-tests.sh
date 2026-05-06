@@ -46,6 +46,17 @@ assert_extension "include .ch"      "include.ch"       0
 assert_extension "rejects .txt"     "readme.txt"       1
 assert_extension "rejects no-ext"   "Makefile"         1
 
+assert_utf8() {
+  local label="$1" fixture="$2" expected="$3"
+  bash "$LIB" is_utf8 "$FIXTURES_DIR/$fixture"
+  local rc=$?
+  if [ "$rc" = "$expected" ]; then pass "is_utf8: $label"; else fail "is_utf8: $label rc=$rc expected=$expected"; fi
+}
+
+assert_utf8 "utf8 with acentos"   "utf8-acentos.txt"   0
+assert_utf8 "cp1252 with acentos" "cp1252-acentos.txt" 1
+assert_utf8 "pure ascii"          "ascii-puro.txt"     0
+
 # Cases will be added in Task 7
 echo "Test runner ready. PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
