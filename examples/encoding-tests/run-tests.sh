@@ -15,6 +15,16 @@ PASS=0; FAIL=0
 fail() { echo "  ✗ $1"; FAIL=$((FAIL+1)); }
 pass() { echo "  ✓ $1"; PASS=$((PASS+1)); }
 
+# Portable charset detection: tries `file -bI` (BSD/macOS) then `file -bi` (GNU/Linux)
+detect_charset() {
+  local f="$1" out
+  out=$(file -bI "$f" 2>/dev/null) || out=""
+  if ! echo "$out" | grep -q 'charset='; then
+    out=$(file -bi "$f" 2>/dev/null) || out=""
+  fi
+  echo "$out" | sed -n 's/.*charset=\([^[:space:];]*\).*/\1/p'
+}
+
 run_case() {
   local name="$1" fixture="$2" expected="$3"
   echo "[$name]"
@@ -22,7 +32,7 @@ run_case() {
   cp "$FIXTURES_DIR/$fixture" "$tmp"
   bash "$LIB" process_file "$tmp" 2>/tmp/err.log
   local actual_encoding
-  actual_encoding=$(file -bi "$tmp" | sed -n 's/.*charset=\([^[:space:]]*\).*/\1/p')
+  actual_encoding=$(detect_charset "$tmp")
   if [ "$actual_encoding" = "$expected" ]; then
     pass "$name → $actual_encoding"
   else
@@ -77,7 +87,7 @@ assert_converts_to_cp1252() {
   local rc=$?
   if [ "$rc" = 0 ]; then
     local enc
-    enc=$(file -bI "$tmp" 2>/dev/null | sed -n 's/.*charset=\([^[:space:];]*\).*/\1/p')
+    enc=$(detect_charset "$tmp")
     if [ "$enc" = "iso-8859-1" ] || [ "$enc" = "us-ascii" ]; then
       pass "convert: $label → $enc"
     else
