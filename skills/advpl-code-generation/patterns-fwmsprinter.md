@@ -57,7 +57,7 @@ oPrint := FWMSPrinter():New( ;
     nDevice,      ;   // (2) Output device. Use IMP_PDF for PDF generation.
     lAdjustToLegacy,; // (3) .F. recommended for new reports
     cPathInServer, ;  // (4) Server path (NIL = use cPathPDF property)
-    lDisabeSetup,  ;  // (5) .T. = skip setup dialog, .F. = show dialog
+    lDisableSetup, ;  // (5) .T. = skip setup dialog, .F. = show dialog
     lTReport,      ;  // (6) NIL = standalone (not called by TReport)
     oPrintSetup,   ;  // (7) FWPrintSetup object (NIL for standalone use)
     cPrinter,      ;  // (8) Printer name (NIL for default)
@@ -216,7 +216,7 @@ oBrush:End()
 - First argument must be an **array** `{nTop, nLeft, nBottom, nRight}` — NOT 4 separate numeric parameters.
 - Second argument must be a **TBrush object** — NOT an `RGB()` integer.
 - Always call `oBrush:End()` after use to release the GDI resource.
-- First parameter of `TBrush():New(, nColor)` must be a **comma (NIL)** — not the keyword `NIL`.
+- First parameter of `TBrush():New()` must be **omitted** (passed as comma) — do not pass `0` or a valid window handle, as that changes the brush behavior.
 
 **Recommended: encapsulate in a helper function**
 
@@ -387,12 +387,13 @@ At 7pt Arial, approximately 4–4.5px per character.
 
 ```advpl
 #Include "TOTVS.CH"
-#Include "TBICONN.CH"
+#Include "TBICONN.CH"      // required for BeginSQL/EndSQL
 #Include "FWPrintSetup.CH"
 
 #Define PAD_LEFT    0
 #Define PAD_RIGHT   1
 #Define PAD_CENTER  2
+#Define PAD_JUSTIFY 3   // TOTVS Printer >= 1.6.2
 
 /*/{Protheus.doc} zFwRpt
 Example FWMSPrinter report — product listing with group totals.
@@ -409,7 +410,15 @@ User Function zFwRpt()
     FWRestArea(aArea)
 Return
 
+/*/{Protheus.doc} fPrintRpt
+Builds the SQL query, initializes the FWMSPrinter object, iterates
+all records printing header and data rows, and shows the preview dialog.
+@type Static Function
+/*/
 Static Function fPrintRpt()
+    Local aArea    := FWGetArea()
+    Local oError   := Nil
+
     // Fonts
     Local oFontTit := TFont():New("Arial",, -11, .T., .F.)
     Local oFontHdr := TFont():New("Arial",,  -7, .T., .F.)
@@ -436,7 +445,6 @@ Static Function fPrintRpt()
     Local nI        := 0
     Local oPrint    := Nil
     Local cAlias    := GetNextAlias()
-    Local cQuery    := ""
 
     // Column definitions
     Local aCol := {}
@@ -453,84 +461,106 @@ Static Function fPrintRpt()
         nAcum += aCol[nI][4] + 2
     Next nI
 
-    // SQL query
-    cQuery := " SELECT B1_COD, B1_DESC, B1_TIPO, B1_UM, B1_PRV1 "
-    cQuery += "   FROM " + RetSqlName("SB1") + " SB1 "
-    cQuery += "  WHERE SB1.D_E_L_E_T_ = ' ' "
-    cQuery += "    AND B1_FILIAL = '" + xFilial("SB1") + "' "
-    cQuery += "  ORDER BY B1_TIPO, B1_COD "
+    Begin Sequence
 
-    cQuery := ChangeQuery(cQuery)
-    DbUseArea(.T., "TOPCONN", TcGenQry(,, cQuery), cAlias, .F., .T.)
+        // SQL query — BeginSQL handles table name, xFilial and D_E_L_E_T_ automatically
+        BeginSQL Alias cAlias
+            SELECT B1_COD, B1_DESC, B1_TIPO, B1_UM, B1_PRV1
+            FROM %table:SB1% SB1
+            WHERE SB1.%notDel%
+              AND SB1.B1_FILIAL = %xfilial:SB1%
+            ORDER BY B1_TIPO, B1_COD
+        EndSQL
 
-    // Initialize printer
-    oPrint := FWMSPrinter():New( ;
-        "ZFWRPT_" + RetCodUsr() + "_" + DToS(Date()), ;
-        IMP_PDF, .F.,, .T.,,,,,,, .T. ;
-    )
-    oPrint:cPathPDF := GetTempPath()
-    oPrint:SetResolution(72)
-    oPrint:SetLandscape()
-    oPrint:SetPaperSize(DMPAPER_A4)
-    oPrint:SetMargin(0, 0, 0, 0)
+        // Initialize printer
+        oPrint := FWMSPrinter():New( ;
+            "ZFWRPT_" + RetCodUsr() + "_" + DToS(Date()), ;
+            IMP_PDF, .F.,, .T.,,,,,,, .T. ;
+        )
+        oPrint:cPathPDF := GetTempPath()
+        oPrint:SetResolution(72)
+        oPrint:SetLandscape()
+        oPrint:SetPaperSize(DMPAPER_A4)
+        oPrint:SetMargin(0, 0, 0, 0)
 
-    // First page
-    (cAlias)->(DbGoTop())
-    nPag++
-    oPrint:StartPage()
-    nLinAtu := fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, nAltLin, nPag, nCorAzul, nCorBranco)
-    nLinIdx := 0
+        // First page
+        (cAlias)->(DbGoTop())
+        nPag++
+        oPrint:StartPage()
+        nLinAtu := fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, nAltLin, nPag, nCorAzul, nCorBranco)
+        nLinIdx := 0
 
-    // Data loop
-    While !(cAlias)->(Eof())
+        // Data loop
+        While !(cAlias)->(Eof())
 
-        If nLinAtu + nAltLin > nLinMax
-            oPrint:EndPage()
-            nPag++
-            oPrint:StartPage()
-            nLinAtu := fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, nAltLin, nPag, nCorAzul, nCorBranco)
-            nLinIdx  := 0
-        EndIf
+            If nLinAtu + nAltLin > nLinMax
+                oPrint:EndPage()
+                nPag++
+                oPrint:StartPage()
+                nLinAtu := fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, nAltLin, nPag, nCorAzul, nCorBranco)
+                nLinIdx  := 0
+            EndIf
 
-        // Zebra background
-        nLinIdx++
-        If nLinIdx % 2 == 0
-            fFillRect(oPrint, nLinAtu, nColIni, nLinAtu + nAltLin - 1, nColFim, nCorZebra)
-        EndIf
+            // Zebra background
+            nLinIdx++
+            If nLinIdx % 2 == 0
+                fFillRect(oPrint, nLinAtu, nColIni, nLinAtu + nAltLin - 1, nColFim, nCorZebra)
+            EndIf
 
-        // Print columns
-        oPrint:SayAlign(nLinAtu, aCol[1][3], AllTrim((cAlias)->B1_COD),  oFontDet, aCol[1][4], nAltLin, nCorPreto, aCol[1][5], Nil)
-        oPrint:SayAlign(nLinAtu, aCol[2][3], AllTrim((cAlias)->B1_DESC), oFontDet, aCol[2][4], nAltLin, nCorPreto, aCol[2][5], Nil)
-        oPrint:SayAlign(nLinAtu, aCol[3][3], AllTrim((cAlias)->B1_TIPO), oFontDet, aCol[3][4], nAltLin, nCorPreto, aCol[3][5], Nil)
-        oPrint:SayAlign(nLinAtu, aCol[4][3], AllTrim((cAlias)->B1_UM),   oFontDet, aCol[4][4], nAltLin, nCorPreto, aCol[4][5], Nil)
-        oPrint:SayAlign(nLinAtu, aCol[5][3], Transform((cAlias)->B1_PRV1, "99,999.99"), oFontDet, aCol[5][4], nAltLin, nCorPreto, aCol[5][5], Nil)
+            // Print columns
+            oPrint:SayAlign(nLinAtu, aCol[1][3], AllTrim((cAlias)->B1_COD),  oFontDet, aCol[1][4], nAltLin, nCorPreto, aCol[1][5], Nil)
+            oPrint:SayAlign(nLinAtu, aCol[2][3], AllTrim((cAlias)->B1_DESC), oFontDet, aCol[2][4], nAltLin, nCorPreto, aCol[2][5], Nil)
+            oPrint:SayAlign(nLinAtu, aCol[3][3], AllTrim((cAlias)->B1_TIPO), oFontDet, aCol[3][4], nAltLin, nCorPreto, aCol[3][5], Nil)
+            oPrint:SayAlign(nLinAtu, aCol[4][3], AllTrim((cAlias)->B1_UM),   oFontDet, aCol[4][4], nAltLin, nCorPreto, aCol[4][5], Nil)
+            oPrint:SayAlign(nLinAtu, aCol[5][3], Transform((cAlias)->B1_PRV1, "99,999.99"), oFontDet, aCol[5][4], nAltLin, nCorPreto, aCol[5][5], Nil)
 
-        nTotalQtd++
-        oPrint:Line(nLinAtu + nAltLin, nColIni, nLinAtu + nAltLin, nColFim, RGB(210,210,210))
-        nLinAtu += nAltLin
+            nTotalQtd++
+            oPrint:Line(nLinAtu + nAltLin, nColIni, nLinAtu + nAltLin, nColFim, RGB(210,210,210))
+            nLinAtu += nAltLin
 
-        (cAlias)->(DbSkip())
-        ProcessMessages()
-    EndDo
+            (cAlias)->(DbSkip())
+            ProcessMessages()  // allows AppServer to process control messages during the loop
+        EndDo
 
-    // Totals footer
-    nLinAtu += 4
-    oPrint:Line(nLinAtu, nColIni, nLinAtu, nColFim, nCorAzul)
-    nLinAtu += 3
-    fFillRect(oPrint, nLinAtu, nColIni, nLinAtu + nAltLin + 2, nColFim, RGB(218, 228, 242))
-    oPrint:SayAlign(nLinAtu + 1, aCol[1][3], "TOTAL: " + AllTrim(Str(nTotalQtd)) + " registros", ;
-        oFontTot, 200, nAltLin, nCorAzul, PAD_LEFT, Nil)
+        // Totals footer
+        nLinAtu += 4
+        oPrint:Line(nLinAtu, nColIni, nLinAtu, nColFim, nCorAzul)
+        nLinAtu += 3
+        fFillRect(oPrint, nLinAtu, nColIni, nLinAtu + nAltLin + 2, nColFim, RGB(218, 228, 242))
+        oPrint:SayAlign(nLinAtu + 1, aCol[1][3], "TOTAL: " + AllTrim(Str(nTotalQtd)) + " registros", ;
+            oFontTot, 200, nAltLin, nCorAzul, PAD_LEFT, Nil)
 
-    oPrint:EndPage()
-    (cAlias)->(DbCloseArea())
-    oPrint:Preview()
+        oPrint:EndPage()
+        oPrint:Preview()
+
+    Recover Using oError
+        ConOut("[fPrintRpt] Erro: " + oError:Description)
+    End Sequence
+
+    If Select(cAlias) > 0
+        (cAlias)->(DbCloseArea())
+    EndIf
+
+    FWRestArea(aArea)
 
 Return
 
-// -------------------------------------------------------
-// fRptHeader - Prints page header and column titles
-//              Returns next available Y coordinate
-// -------------------------------------------------------
+/*/{Protheus.doc} fRptHeader
+Prints the page header (title bar and column titles bar).
+Returns the next available Y coordinate after the header block.
+@type Static Function
+@param oPrint, Object, Active FWMSPrinter instance
+@param aCol, Array, Column definitions {field,title,X,width,align}
+@param oFontTit, Object, TFont for the report title
+@param oFontHdr, Object, TFont for column header labels
+@param nColIni, Numeric, Left margin X coordinate
+@param nColFim, Numeric, Right margin X coordinate
+@param nAltLin, Numeric, Line height in pixels
+@param nPag, Numeric, Current page number
+@param nCorAzul, Numeric, Blue color as RGB integer
+@param nCorBranco, Numeric, White color as RGB integer
+@return Numeric, Next Y coordinate after the header block
+/*/
 Static Function fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, nAltLin, nPag, nCorAzul, nCorBranco)
     Local nLin := 8
     Local nI   := 0
@@ -551,10 +581,18 @@ Static Function fRptHeader(oPrint, aCol, oFontTit, oFontHdr, nColIni, nColFim, n
 
 Return nLin
 
-// -------------------------------------------------------
-// fFillRect - Fills a rectangle with a solid color
-//             Encapsulates TBrush creation/destruction
-// -------------------------------------------------------
+/*/{Protheus.doc} fFillRect
+Fills a rectangle with a solid color.
+Encapsulates TBrush creation and destruction so callers never
+need to manage the GDI resource directly.
+@type Static Function
+@param oPrint, Object, Active FWMSPrinter instance
+@param nTop, Numeric, Top Y coordinate
+@param nLeft, Numeric, Left X coordinate
+@param nBottom, Numeric, Bottom Y coordinate
+@param nRight, Numeric, Right X coordinate
+@param nColor, Numeric, Fill color as RGB() integer
+/*/
 Static Function fFillRect(oPrint, nTop, nLeft, nBottom, nRight, nColor)
     Local oBrush := TBrush():New(, nColor)
     oPrint:FillRect({nTop, nLeft, nBottom, nRight}, oBrush)
