@@ -8,6 +8,12 @@ Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
 O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-05-29
+
+### Adicionado
+
+- Nova referencia `skills/advpl-code-generation/patterns-fwmsprinter.md` — guia completo para gerar relatorios PDF por coordenadas com `FWMSPrinter`. Cobre o constructor (assinatura de 12 parametros com `IMP_PDF`, `cPathPDF`, `SetResolution`), metodos de setup (`SetLandscape`, `SetPaperSize`, `SetMargin`), primitivas de desenho (`SayAlign` com constantes `PAD_LEFT/RIGHT/CENTER/JUSTIFY`, `Line`, `FillRect` via `TBrush`, `SayBitmap`), classes de apoio (`TFont` com altura negativa, `TBrush` com `End()` obrigatorio), estrategias de layout (array de colunas cumulativo, guarda de quebra de pagina, layout de duas linhas por registro), tabela de larguras em pixels para A4 paisagem, exemplo completo funcional (query com `BeginSQL`/`EndSQL`, tratamento de erros com `Begin Sequence`/`Recover`, `FWGetArea`/`FWRestArea`, cabecalhos `Protheus.doc`, helper `fFillRect`), 5 padroes comuns (cabecalho colorido, zebra striping, campos em branco, linha de totais, cabecalhos em dois niveis) e tabela de referencia de erros de runtime com correcoes. Todas as assinaturas verificadas contra o build Protheus 7.00.240223P. Contribuicao de Henrique Patriota ([@suportem3](https://github.com/suportem3), M3 Case) via [PR #12](https://github.com/thalysjuvenal/advpl-specialist/pull/12).
+
 ## [1.1.3] - 2026-05-06
 
 ### Adicionado

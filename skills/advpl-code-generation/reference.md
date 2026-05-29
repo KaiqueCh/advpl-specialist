@@ -144,6 +144,7 @@ ErrorBlock(bErrorOld)
 | REST API | .prw or .tlpp | patterns-rest.md |
 | Ponto de Entrada | .prw | patterns-pontos-entrada.md |
 | Web Service SOAP | .prw | patterns-soap.md |
+| PDF report (coordinate-based) | .prw | patterns-fwmsprinter.md |
 
 ## Function Keyword Rules (CRITICAL)
 
