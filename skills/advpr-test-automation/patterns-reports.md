@@ -304,15 +304,15 @@ Os métodos abaixo pertencem à classe `FWTestHelper`. Detalhes completos de ass
 
 ## Boas Práticas Específicas
 
-### Excecao legitima — variaveis Private em relatórios (TOTVS Report e FWMSPrinter)
+### Exceção legítima — variáveis Private em relatórios (TOTVS Report e FWMSPrinter)
 
 Scripts de relatório frequentemente declaram variáveis `Private` antes da chamada de `ReportDef()` ou do objeto `FWMSPrinter`. Isso **não é violação** das boas práticas do ADVPR — é a exceção legítima documentada em `best-practices.md`.
 
-**Quando aplicar a excecao:**
+**Quando aplicar a exceção:**
 
 - A rotina de origem (`FINR501`, `MATR797`, etc.) utiliza variáveis `Private` internamente para controle do relatório (ex.: `cPerg`, `cAliasQry`, `cAlias`, `aArray`, `li`, `nMaxLin`, `nMaxCol`, `lItemNeg`).
 - Essas variáveis são declaradas **antes** da chamada a `ReportDef()` ou da construção do objeto `FWMSPrinter`:New().
-- Validações de SX3 que referenciam `ALTERA` ou `INCLUI` seguem o mesmo padrão e também são excecoes validas.
+- Validações de SX3 que referenciam `ALTERA` ou `INCLUI` seguem o mesmo padrão e também são exceções válidas.
 
 O script de testes **replica** essas declarações `Private` para que o ambiente de execução do robô seja equivalente ao da rotina padrão. Trate-as como parte do contrato da rotina, não como erro.
 
@@ -326,7 +326,7 @@ Private nMaxCol  := 0
 Private lItemNeg := .F.
 ```
 
-### Restaurar parametros e data apos o teste
+### Restaurar parâmetros e data após o teste
 
 Sempre restaure os parâmetros MV_* e a data base ao final do método de teste, independentemente do tipo de relatório:
 
@@ -348,7 +348,7 @@ O objeto `FWMSPrinter` deve ser configurado com parâmetros específicos para qu
 - **9º parâmetro = `.T.`**: impede a exclusão automática do arquivo temporário `.rel`.
 - Definir explicitamente `CFILENAME` e `CFILEPRINT` para garantir o nome padronizado no formato `"Rotina"+"_001.rel"`.
 
-### Smart View — configuracao local e de esteira
+### Smart View — configuração local e de esteira
 
 - Testes locais: adicionar `URL_SMARTVIEW=http://localhost:7017` na seção `[ADVPR]` do `appserver.ini`.
 - Esteira de CI: abrir task no Ryver para cadastrar a suíte com as configurações de REST e Smart View antes de executar.

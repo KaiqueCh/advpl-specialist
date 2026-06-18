@@ -134,7 +134,7 @@ Em scripts ADVPR normais, todas as variáveis devem ser `Local`. A única exceç
 
 Não use `While`/`For`, `DbSeek` ou `RecLock` para verificar o resultado do processamento. Use exclusivamente `UTQueryDB`:
 
-- **Nao use:** loop `While !Eof()` sobre a tabela de resultado
+- **Não use:** loop `While !Eof()` sobre a tabela de resultado
 - **Use:** `oHelper:UTQueryDB(cTable, cField, cWhere, xExpected)` para cada campo a verificar
 
 `UTQueryDB` é seguro para ambiente multi-filial, respeita soft-delete e acumula o resultado em `oHelper:lOk` para que `AssertTrue` consuma ao final.

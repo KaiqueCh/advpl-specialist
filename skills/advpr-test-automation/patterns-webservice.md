@@ -297,6 +297,6 @@ Consulte `best-practices.md` para as diretrizes gerais de escrita de scripts ADV
 
 **Portal Protheus**
 - Inspecione as requisições pelo "Ferramentas do desenvolvedor" do navegador antes de escrever o script (método, headers exatos, estrutura do body).
-- Para `multipart/form-data`, sempre inserir `CRLF` em branco antes do valor de cada campo (obrigatorio pelo protocolo HTTP multipart).
+- Para `multipart/form-data`, sempre inserir `CRLF` em branco antes do valor de cada campo (obrigatório pelo protocolo HTTP multipart).
 - O `SessionID` retornado por `UTSetLoginPP` deve ser enviado no header `Cookie` em todas as requisições subsequentes.
 - A execução de testes do Portal exige protheus_data (systemload e web) atualizado e usuários configurados na Base Congelada.
