@@ -1,19 +1,60 @@
 ---
 title: SX Configuration
-description: Templates e regras de validacao para gerar scripts de configuracao do dicionario SX do TOTVS Protheus
+description: "Templates e regras de validacao para gerar scripts de configuracao do dicionario SX do TOTVS Protheus - SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB e SX7"
 ---
 
 # SX Configuration
 
-Templates e regras de validacao para gerar scripts de configuracao do dicionario de dados Protheus. Cobre SX3 (campos), SIX (indices), SX1 (perguntas de relatorio), SX5 (tabelas genericas) e SX7 (gatilhos).
+Templates e regras de validacao para gerar scripts de configuracao do dicionario de dados Protheus. Cobre SX2 (cabecalho de tabela), SX3 (campos), SIX (indices), SXG (grupos de campos), SXA (pastas de cadastro), SX1 (perguntas de relatorio), SX5 (tabelas genericas), SXB (consultas padrao F3) e SX7 (gatilhos).
 
 ## Quando Usar
 
+- Registrar uma nova tabela customizada (cabecalho)
 - Criar novos campos customizados para uma tabela
 - Definir indices para tabelas customizadas
+- Agrupar campos relacionados entre tabelas (grupos de campo)
+- Organizar campos em pastas/abas em formularios MVC
 - Configurar perguntas de parametros de relatorio
 - Criar tabelas genericas de lookup
+- Configurar consultas padrao F3
 - Configurar gatilhos de campo
+
+## SX2 -- Mapeamento de Tabelas
+
+Define a propria tabela: alias, nome fisico, modo de compartilhamento e modo de acesso. **Deve ser criada antes** de gerar campos SX3 para uma nova tabela customizada.
+
+### Campos Obrigatorios
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| X2_CHAVE | Alias da tabela (3 chars) | ZA1 |
+| X2_PATH | Caminho (geralmente vazio — usa o padrao) | |
+| X2_ARQUIVO | Padrao do nome fisico | ZA1990 |
+| X2_NOME | Descricao pt-BR | Ordens de Servico |
+| X2_NOMESPA | Descricao es | Ordenes de Servicio |
+| X2_NOMEENG | Descricao en | Service Orders |
+| X2_MODO | Modo de compartilhamento: C/E/M | C |
+| X2_MODOEMP | Modo de compartilhamento por empresa | C |
+| X2_MODOUN | Modo de compartilhamento por filial | C |
+| X2_TTS | Tabela transacional (Sim/Nao) | Sim |
+| X2_PYME | Disponivel na edicao PYME (Sim/Nao) | Sim |
+| X2_USROPER | Auditoria de usuario (Sim/Nao) | Sim |
+
+### Referencia de Modo de Compartilhamento
+
+| X2_MODO | Significado | Caso de Uso |
+|---------|-------------|-------------|
+| `C` | Compartilhado (entre todas as empresas/filiais) | Tabelas de lookup globais, parametros |
+| `E` | Exclusivo (por filial) | Maioria das tabelas transacionais (SA1, SE1, SF2) |
+| `M` | Misto (depende de X2_MODOEMP/X2_MODOUN) | Casos especiais multi-tenant |
+
+### Regras
+
+- Alias deve ter 3 chars maiusculos; tabelas customizadas usam prefixo `Z` (`ZA1`-`ZZZ`, `Z01`-`Z99`).
+- O nome fisico (`X2_ARQUIVO`) e o **nome base** antes do padding de empresa/filial (ex.: `ZA1990`). Em tempo de execucao, o DBAccess acrescenta o codigo da empresa, produzindo `ZA1990010`.
+- Use **`RetSqlName("ZA1")` em tempo de execucao** — nunca hardcode o nome fisico.
+- `X2_TTS = Sim` habilita controle transacional via `BeginTran/EndTran`. Obrigatorio para qualquer tabela modificada dentro de blocos `RecLock` que precisem de rollback.
+- Para novas tabelas customizadas: registre SX2 primeiro, depois SX3, depois SIX, e por fim SXG/SXA/SXB/SX7 opcionais.
 
 ## SX3 -- Definicao de Campo
 
@@ -109,6 +150,75 @@ Templates e regras de validacao para gerar scripts de configuracao do dicionario
 - Nickname deve ser unico dentro da tabela
 - Ordem deve ser sequencial comecando de 1
 
+## SXG -- Grupos de Campos
+
+Grupos definem um **contrato compartilhado de tamanho/decimais** entre campos que devem permanecer alinhados (ex.: um campo de codigo de cliente que aparece em SA1, SE1, SC5 deve sempre ter o mesmo tamanho em todos os lugares). Alterar o grupo propaga a mudanca para todos os campos vinculados via ferramenta de atualizacao do dicionario.
+
+### Campos Obrigatorios
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| XG_GRUPO | Codigo do grupo (3 chars/digitos) | 033 |
+| XG_DESCRIC | Descricao pt-BR | Codigo do Cliente |
+| XG_DESCSPA | Descricao es | Codigo del Cliente |
+| XG_DESCENG | Descricao en | Customer Code |
+| XG_TAMANHO | Tamanho | 6 |
+| XG_DECIMAL | Decimais (para N) | 0 |
+| XG_PICTURE | Formato de exibicao | @! |
+| XG_TIPO | Tipo: C, N, D, L, M | C |
+
+### Vinculando Campos SX3 a um Grupo
+
+No registro SX3 de cada campo relacionado, preencha `X3_GRUPO` com o codigo do grupo:
+
+```
+X3_CAMPO   = A1_COD
+X3_GRUPO   = 033
+X3_TAMANHO = 6     (deve coincidir com XG_TAMANHO)
+X3_TIPO    = C     (deve coincidir com XG_TIPO)
+```
+
+### Regras
+
+- Codigo do grupo: 3 chars (TOTVS usa numerico `001`-`999`; grupos customizados usam prefixo `Z`, como `Z01`).
+- Todos os campos SX3 com o mesmo `X3_GRUPO` devem concordar em `X3_TIPO`, `X3_TAMANHO`, `X3_DECIMAL` e `X3_PICTURE`.
+- Use um grupo sempre que o mesmo campo logico existir em 2 ou mais tabelas (codigos, chaves estrangeiras, totais).
+- A ferramenta de atualizacao do dicionario (`UpdDistr`/`UPDDISTR`) usa SXG para propagar alteracoes de tamanho — sem grupo, cada linha SX3 deve ser editada manualmente.
+
+## SXA -- Pastas de Cadastro
+
+Define pastas (abas) usadas para organizar visualmente os campos em formularios MVC (`AxCadastro`, `MVCAxCadastro`, FormView). Sem o registro SXA, as views MVC retornam para uma unica aba padrao.
+
+### Campos Obrigatorios
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| XA_ALIAS | Alias da tabela | ZA1 |
+| XA_ORDEM | Ordem da pasta (2 digitos) | 01 |
+| XA_DESCRIC | Nome da pasta pt-BR | Cadastrais |
+| XA_DESCSPA | Nome da pasta es | Generales |
+| XA_DESCENG | Nome da pasta en | General |
+| XA_AGRUPCM | Agrupamento visual (opcional) | |
+
+### Vinculando Campos SX3 a uma Pasta
+
+Em cada linha SX3, defina `X3_FOLDER` com a ordem da pasta desejada:
+
+```
+X3_CAMPO  = ZA1_CODIGO
+X3_FOLDER = 01            -- Vai para a pasta "Cadastrais"
+
+X3_CAMPO  = ZA1_OBSERV
+X3_FOLDER = 02            -- Vai para a pasta "Observacoes"
+```
+
+### Regras
+
+- A ordem das pastas deve ser sequencial (01, 02, 03...) por tabela.
+- Um campo com `X3_FOLDER` vazio e alocado na pasta 01.
+- Os nomes das pastas aparecem traduzidos de acordo com o idioma do usuario (pt-BR / es / en).
+- Para telas master-detail complexas, combine SXA com a configuracao de view `FWFormDetail` (o SXA define as pastas; a View anexa as grids a elas).
+
 ## SX1 -- Perguntas de Relatorio
 
 ### Campos Obrigatorios
@@ -157,6 +267,80 @@ Templates e regras de validacao para gerar scripts de configuracao do dicionario
 - Codigo da tabela: 2 caracteres maiusculos (usar prefixo Z para custom: ZA, ZB, ZZ, etc.)
 - Chave: 2 caracteres, sequencial (01, 02, 03...)
 - Para usar no codigo: GetSX5("ZZ", "01") ou X5DESCRI("ZZ", "01")
+
+## SXB -- Consultas Padrao (F3)
+
+Define a **janela de lookup F3**: o dialogo que abre quando o usuario pressiona F3 em um campo com `X3_F3` preenchido. Configura colunas de pesquisa, colunas exibidas no resultado e o valor retornado ao campo de origem. Composto por 4 tipos de linha (`XB_TIPO`): `1` = definicao do lookup, `2` = indice de pesquisa, `3` = colunas de exibicao, `4` = expressao de retorno.
+
+### Campos Obrigatorios (cabecalho / tipo 1)
+
+| Campo | Descricao | Exemplo |
+|-------|-----------|---------|
+| XB_ALIAS | Codigo do lookup (coincide com X3_F3) | SA1 |
+| XB_TIPO | Tipo da linha: 1, 2, 3, 4 | 1 |
+| XB_SEQ | Sequencia (2 digitos) | 01 |
+| XB_COLUNA | Referencia de coluna/ordem | DB |
+| XB_DESCRIC | Descricao pt-BR | Clientes |
+| XB_DESCSPA | Descricao es | Clientes |
+| XB_DESCENG | Descricao en | Customers |
+| XB_CONTEM | Conteudo (expressao de chave / nome de campo) | SA1 |
+| XB_WCONTEM | Clausula when (opcional) | |
+
+### Referencia de Tipos de Linha
+
+| XB_TIPO | Finalidade | O que vai em XB_CONTEM |
+|---------|-----------|------------------------|
+| `1` | Cabecalho do lookup (um por alias) | Alias da tabela de origem (ex.: `SA1`) |
+| `2` | Indice de pesquisa | Numero de ordem do indice para pesquisa (ex.: `1`, `3`) |
+| `3` | Coluna de exibicao na janela de lookup | Nome do campo (ex.: `A1_COD`, `A1_NOME`) |
+| `4` | Expressao de retorno -- valor devolvido ao campo de origem | Expressao AdvPL (ex.: `SA1->A1_COD`) |
+
+### Exemplo: Lookup Customizado de SA1 por Nome
+
+```
+-- Tipo 1: Cabecalho
+XB_ALIAS    = SACN  (codigo customizado de 4 chars)
+XB_TIPO     = 1
+XB_SEQ      = 01
+XB_DESCRIC  = Clientes por Nome
+XB_CONTEM   = SA1
+
+-- Tipo 2: Pesquisa pelo indice 3 (A1_FILIAL + A1_NOMECOM)
+XB_TIPO     = 2
+XB_SEQ      = 01
+XB_CONTEM   = 3
+
+-- Tipo 3: Exibir A1_COD, A1_LOJA, A1_NOME no grid de lookup
+XB_TIPO     = 3
+XB_SEQ      = 01
+XB_CONTEM   = A1_COD
+XB_TIPO     = 3
+XB_SEQ      = 02
+XB_CONTEM   = A1_LOJA
+XB_TIPO     = 3
+XB_SEQ      = 03
+XB_CONTEM   = A1_NOME
+
+-- Tipo 4: Retornar A1_COD ao campo de origem
+XB_TIPO     = 4
+XB_SEQ      = 01
+XB_CONTEM   = SA1->A1_COD
+```
+
+O campo de origem referencia o lookup assim:
+
+```
+X3_F3 = SACN
+```
+
+### Regras
+
+- `XB_ALIAS` deve coincidir exatamente com `X3_F3` (normalmente o proprio alias da tabela, mas codigos customizados de 4 chars como `SACN` sao validos para lookups alternativos na mesma tabela).
+- Sempre fornecer ao menos um registro de cada tipo 1, 2, 3 e 4 -- do contrario a janela de lookup ficara incompleta.
+- Multiplos registros do tipo 2 permitem ao usuario alternar entre indices de pesquisa (F12 no lookup).
+- Multiplos registros do tipo 3 definem as colunas exibidas -- a ordem importa.
+- A expressao do tipo 4 deve retornar um valor compativel com o tipo e tamanho do campo de origem.
+- A filtragem de `D_E_L_E_T_` e feita implicitamente pelo indice subjacente -- o SXB usa Workarea (`DbSeek`) internamente, nao SQL direto.
 
 ## SX7 -- Gatilhos
 

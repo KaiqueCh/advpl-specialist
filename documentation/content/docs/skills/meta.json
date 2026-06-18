@@ -6,13 +6,16 @@
     "advpl-debugging",
     "advpl-refactoring",
     "advpl-to-tlpp-migration",
+    "advpr-test-automation",
     "changelog-patterns",
     "code-explanation",
     "documentation-patterns",
     "embedded-sql",
     "probat-testing",
     "protheus-business",
+    "protheus-locks-deadlocks",
     "protheus-reference",
+    "query-builder",
     "sx-configuration",
     "tdn-lookup"
   ]

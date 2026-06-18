@@ -1,0 +1,228 @@
+---
+title: Query Builder
+description: Decisao Workarea vs SQL, FWPreparedStatement, consciencia de indices SIX e queries cross-database no Protheus
+---
+
+# Query Builder
+
+A skill `query-builder` orienta a escolha do padrao correto para acessar dados no Protheus, forca os filtros obrigatorios de filial e soft-delete, alinha cláusulas WHERE a indices SIX e garante parametrizacao segura de todos os valores dinamicos.
+
+> **Skill complementar:** `embedded-sql` cobre os blocos `BeginSQL/EndSQL` com as macros `%table%`, `%notDel%`, `%xfilial%` e `%exp%`. Esta skill cobre tudo **ao redor** da query: escolha de padrao, indices, seguranca e compatibilidade entre bancos.
+
+## Filtros Obrigatorios
+
+Toda query contra tabelas Protheus deve incluir **dois filtros** sem excecao:
+
+| Campo | Filtro | Finalidade |
+|---|---|---|
+| `D_E_L_E_T_` | `= ' '` (espaco simples) | Exclusao logica. `'*'` = registro deletado |
+| `XX_FILIAL` | `= xFilial("XXX")` ou `FWxFilial("XXX")` | Filtro multi-filial |
+
+Omitir `D_E_L_E_T_` retorna registros deletados. Omitir o filtro de filial vaza dados entre filiais — normalmente um bug e frequentemente uma falha de seguranca.
+
+O nome fisico da tabela nunca deve ser hardcoded. Use sempre `RetSqlName("SA1")` para resolver o nome conforme o ambiente.
+
+## Quando Usar Workarea (DbSeek/Navegacao por Indice)
+
+Workarea e o padrao correto quando:
+
+- A busca e por chave primaria de um unico registro via indice SIX existente.
+- O processamento exige bloqueio de registro para escrita (`RecLock`/`MsUnlock`) com disparo de triggers SX7 e validacoes do dicionario.
+- A iteracao segue uma ordem de indice conhecida, como contas a receber por vencimento.
+
+Evite Workarea quando a query exige agregacao (SUM/COUNT/AVG), JOINs de tres ou mais tabelas, ou quando nao existe indice adequado para o caminho de acesso.
+
+```c
+#Include "TOTVS.CH"
+
+User Function GetCustomerName(cCustCode, cLoja)
+    Local cName    := ""
+    Local aArea    := GetArea()
+    Local aAreaSA1 := SA1->(GetArea())
+
+    DbSelectArea("SA1")
+    SA1->(DbSetOrder(1))  // Indice 1: A1_FILIAL + A1_COD + A1_LOJA
+
+    If SA1->(DbSeek(xFilial("SA1") + cCustCode + cLoja))
+        cName := AllTrim(SA1->A1_NOME)
+    EndIf
+
+    SA1->(RestArea(aAreaSA1))
+    RestArea(aArea)
+Return cName
+```
+
+**Regras essenciais de Workarea:**
+
+- Sempre chame `DbSetOrder(N)` antes de `DbSeek` — o indice pode ter sido alterado por outro trecho de codigo.
+- Monte a chave de busca na **ordem exata da expressao do indice SIX**, preenchendo cada componente com `PadR()` ou `StrZero()` ate o tamanho do campo.
+- Salve e restaure a area corrente com `GetArea()`/`RestArea()` para nao corromper o cursor do chamador.
+- Nunca chame `DbCloseArea()` em aliases de sistema (SA1, SE1, ...) — apenas nos aliases criados com `GetNextAlias()`.
+- Para atualizacoes, todo `RecLock` bem-sucedido deve ser pareado com `MsUnlock()`, inclusive em caminhos de erro.
+
+## FWPreparedStatement (Binding Seguro de Parametros)
+
+`FWPreparedStatement` e a API de queries parametrizadas do Protheus. Ela produz uma string SQL totalmente vinculada via `:GetFixQuery()`, que pode ser passada para `TCGenQry()` (SELECT) ou `TCSqlExec()` (DML).
+
+**Use-a sempre que qualquer valor na query vier de fora da funcao:** campos de formulario, payloads REST, parametros `MV_*`, ou valores lidos de outras tabelas em tempo de execucao. Nunca concatene entrada do usuario diretamente em strings SQL.
+
+```c
+// PERIGOSO — vulneravel a SQL injection
+cQuery += "AND A1_COD = '" + cUserInput + "'"
+
+// SEGURO — parametrizado
+Local oStmt := FWPreparedStatement():New()
+oStmt:SetQuery("SELECT A1_COD, A1_NOME FROM " + RetSqlName("SA1") + " " + ;
+               "WHERE D_E_L_E_T_ = ' ' AND A1_FILIAL = ? AND A1_COD = ?")
+oStmt:SetString(1, xFilial("SA1"))
+oStmt:SetString(2, cUserInput)
+DBUseArea(.T., "TOPCONN", TCGenQry(,, oStmt:GetFixQuery()), cAlias, .F., .T.)
+```
+
+**Referencia rapida da API:**
+
+| Metodo | Finalidade |
+|---|---|
+| `:New()` | Cria a instancia |
+| `:SetQuery(cQuery)` | Define o template com placeholders `?` |
+| `:SetString(n, cValue)` | Vincula o parametro `n` (base 1) a uma string |
+| `:SetNumeric(n, nValue)` | Vincula a um numerico |
+| `:SetDate(n, dValue)` | Vincula a uma data |
+| `:GetFixQuery()` | Retorna a SQL totalmente vinculada e escapada |
+
+Para LIKE, construa os wildcards `%` no lado AdvPL e vincule a string inteira — isso evita diferencas de operador de concatenacao entre bancos. Para listas IN dinamicas, construa os placeholders em loop e vincule um a um; valide `Len(aList) > 0` antes, pois `IN ()` vazio e erro de sintaxe em todos os dialetos.
+
+`TCSqlExec` bypassa triggers SX7 e validacoes do dicionario. Use-o apenas quando esses efeitos colaterais sao explicitamente indesejados (operacoes em lote). Para CRUD normal, prefira Workarea com `RecLock`.
+
+## Consciencia de Indices SIX
+
+O desempenho de queries SQL depende de alinhar o `WHERE` ao indice SIX correspondente. O otimizador do banco so consegue usar um indice quando as colunas iniciais da expressao de chave aparecem no filtro, da esquerda para a direita.
+
+**Indices comuns em tabelas padrao:**
+
+| Tabela | Ordem | Expressao de Chave | Caso de Uso |
+|---|---|---|---|
+| SA1 | 1 | `A1_FILIAL + A1_COD + A1_LOJA` | Busca de cliente por codigo |
+| SA1 | 3 | `A1_FILIAL + A1_CGC` | Busca por CNPJ/CPF |
+| SB1 | 1 | `B1_FILIAL + B1_COD` | Busca de produto |
+| SE1 | 2 | `E1_FILIAL + E1_CLIENTE + E1_LOJA + ...` | Titulos por cliente |
+| SE1 | 6 | `E1_FILIAL + DTOS(E1_VENCREA)` | Titulos por vencimento real |
+| SF2 | 1 | `F2_FILIAL + F2_DOC + F2_SERIE + F2_CLIENTE + F2_LOJA + F2_TIPO` | NF saida |
+
+Exemplo de WHERE alinhado ao indice 2 de SE1:
+
+```c
+SELECT E1_PREFIXO, E1_NUM, E1_VALOR
+FROM SE1010 SE1
+WHERE SE1.D_E_L_E_T_ = ' '
+  AND SE1.E1_FILIAL  = '01'       -- 1a coluna do indice 2
+  AND SE1.E1_CLIENTE = '000001'   -- 2a coluna
+  AND SE1.E1_LOJA    = '01'       -- 3a coluna
+  AND SE1.E1_VALOR   > 0
+```
+
+**Anti-padroes de indice:**
+
+- Leading wildcard `LIKE '%X%'` — nenhum indice e utilizavel; evite ou use full-text search.
+- Funcao sobre coluna como `TO_CHAR(E1_EMISSAO, 'YYYY') = '2026'` — desabilita uso do indice; use `BETWEEN '20260101' AND '20261231'`.
+- Omitir `XX_FILIAL` no WHERE — o otimizador nao consegue usar o indice primario.
+- `OR` entre colunas de indices diferentes — frequentemente leva a scan; reescreva como `UNION ALL`.
+
+Para leitura em SQL Server, adicione `WITH (%nolock%)` a cada tabela no FROM/JOIN de queries somente leitura. O macro `%nolock%` e silenciosamente ignorado no PostgreSQL e Oracle (MVCC), entao o codigo permanece portatil. Nunca use em escritas.
+
+Para Workarea, a chave de busca deve corresponder literalmente a expressao do indice. Use `TamSx3("CAMPO")[1]` para ler o tamanho do campo do dicionario — nunca hardcode o tamanho.
+
+## Queries Cross-Database (PostgreSQL / MSSQL / Oracle)
+
+O Protheus suporta oficialmente PostgreSQL, Microsoft SQL Server e Oracle. O codigo deve rodar sem modificacao nos tres.
+
+**`ChangeQuery(cQuery)`** traduz a string SQL para o dialeto ativo antes da execucao — reescreve `TOP n` para `LIMIT n` (PG) ou `FETCH FIRST n ROWS ONLY` (Oracle), entre outros. `BeginSQL/EndSQL` aplica `ChangeQuery()` automaticamente. Para `TCQuery`/`TCGenQry` raw, chame-o explicitamente.
+
+**`TCGetDB()`** retorna `"MSSQL"`, `"ORACLE"` ou `"POSTGRES"`. Use quando `ChangeQuery()` nao cobre a diferenca (funcoes especificas, tabelas de sistema).
+
+```c
+Local cDB := TCGetDB()
+Local cExpr := ""
+
+Do Case
+    Case cDB == "MSSQL"
+        cExpr := "ISNULL(A1_NOME, '')"
+    Case cDB == "ORACLE"
+        cExpr := "NVL(A1_NOME, '')"
+    Case cDB == "POSTGRES"
+        cExpr := "COALESCE(A1_NOME, '')"
+EndCase
+```
+
+Prefira alternativas ANSI quando existirem — `COALESCE` funciona nos tres bancos e evita o branching.
+
+**Equivalencias entre bancos:**
+
+| Operacao | ANSI / Cross-DB | MSSQL | PostgreSQL | Oracle |
+|---|---|---|---|---|
+| Null coalescing | `COALESCE(a, b)` | `ISNULL(a, b)` | `COALESCE(a, b)` | `NVL(a, b)` |
+| Data atual | use `DtoS(Date())` no AdvPL | `GETDATE()` | `CURRENT_DATE` | `SYSDATE` |
+| Limite de linhas | `FETCH FIRST n ROWS ONLY` | `TOP n` | `LIMIT n` | `FETCH FIRST n ROWS ONLY` |
+| Condicional | `CASE WHEN ... THEN ... END` | igual | igual | igual |
+
+**Datas:** o Protheus armazena datas como strings `YYYYMMDD`. Converta valores AdvPL com `DtoS(dDate)` antes de vincular ou comparar. Nunca use funcoes de data do banco para extrair partes de strings `YYYYMMDD`.
+
+**Tabelas temporarias:** evite `#tmp` (MSSQL) ou `CREATE TEMP TABLE` (PG) direto. Use `FWTemporaryTable` — ele abstrai nomenclatura, escopo e limpeza para os tres bancos.
+
+**Anti-padroes cross-database:**
+
+| Anti-padrao | Problema | Correcao |
+|---|---|---|
+| `GETDATE()` no SQL | Quebra no PG/Oracle | `CURRENT_DATE` ou branch em `TCGetDB()` |
+| `+` para concat de strings no SQL | Quebra no PG/Oracle | Use `CONCAT()` ou monte no lado AdvPL |
+| `WITH (NOLOCK)` hardcoded | Erro de parse no PG/Oracle | Use o macro `%nolock%` |
+| `ISNULL` fora de branch MSSQL | Quebra no PG/Oracle | Use `COALESCE` |
+| `LIMIT n` sem `ChangeQuery()` | Quebra no MSSQL | `ChangeQuery()` ou use `FETCH FIRST` |
+
+## Matriz de Decisao
+
+| Criterio | Workarea (DbSeek) | Embedded SQL (TCQuery) | TCSqlExec (DML) |
+|---|---|---|---|
+| Busca de registro unico por chave | **Melhor** | Aceitavel | — |
+| JOINs multi-tabela / agregacoes | Ruim | **Melhor** | — |
+| Bloqueio de registro para escrita | **Obrigatorio** (`RecLock`) | — | Bypassa locks |
+| Triggers SX7 e validacoes disparam | **Sim** | Nao | **Nao** |
+| DML em lote (sem triggers) | Nao | — | **Melhor** |
+
+**Regra geral:** CRUD em registro unico usa Workarea com `RecLock`. Relatorios, agregacoes e JOINs usam `BeginSQL/EndSQL`. `TCSqlExec` com `FWPreparedStatement` apenas quando triggers e validacoes sao explicitamente indesejados.
+
+## Checklist
+
+### Corretude
+- `D_E_L_E_T_ = ' '` em **todas** as tabelas referenciadas (FROM e todo JOIN)
+- Filtro `XX_FILIAL` em **todas** as tabelas via `xFilial()` ou `FWxFilial()`
+- Nome fisico resolvido via `RetSqlName("XXX")` — nunca hardcoded
+- Alias criado com `GetNextAlias()`
+- `(cAlias)->(DBCloseArea())` chamado em todos os caminhos (sucesso e erro)
+
+### Seguranca
+- Todos os valores dinamicos vinculados via placeholders `?` do `FWPreparedStatement`
+- Sem execucao de macro `&` para construir strings SQL
+- Sem `IIF()` dentro de SQL — use `CASE WHEN` ou `If/Else` no AdvPL
+- Sem `CREATE PROCEDURE` no fonte — use SPManager
+
+### Performance
+- Apenas campos necessarios no `SELECT` (sem `SELECT *`)
+- Ordem das colunas no WHERE alinhada a expressao do indice SIX
+- `WITH (%nolock%)` em queries somente leitura
+- Cache de `GetMV()` / `ExistBlock()` fora de loops
+
+### Cross-Database
+- SQL ANSI-compativel sempre que possivel
+- `ChangeQuery()` aplicado quando TCQuery usa sintaxe especifica de dialeto
+- Branches por `TCGetDB()` apenas quando nenhuma alternativa portatil existe
+
+## Arquivos de Suporte
+
+| Arquivo | Conteudo |
+|---|---|
+| `skills/query-builder/reference.md` | Convencoes de banco Protheus, matriz de decisao, anti-padroes e checklist completo |
+| `skills/query-builder/patterns-workarea.md` | Padroes `DbSelectArea`, `DbSeek`, `RecLock`, save/restore de area |
+| `skills/query-builder/patterns-fwpreparedstatement.md` | SELECT, JOIN, UPDATE/DELETE/INSERT, LIKE, IN-list com `FWPreparedStatement` |
+| `skills/query-builder/index-awareness.md` | Indices SIX por tabela, ordenacao de WHERE, `%nolock%`, validacao de plano de execucao |
+| `skills/query-builder/cross-database.md` | `ChangeQuery()`, `TCGetDB()`, macros DBAccess, equivalencias PG/MSSQL/Oracle, paginacao, tabelas temporarias |

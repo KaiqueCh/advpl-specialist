@@ -1,0 +1,104 @@
+---
+title: /advpr
+description: Gera scripts de automacao de testes ADVPR (Advanced Protheus Robot) - TestSuite/TestGroup/TestCase para MVC, ExecAuto, relatorios, processamento, webservice, Smart View, TOTVS Message e SmartLink
+---
+
+# /advpl-specialist:advpr
+
+Gera scripts de automacao de testes ADVPR (Advanced Protheus Robot) para rotinas do TOTVS Protheus.
+
+## Uso
+
+```bash
+/advpl-specialist:advpr [options]
+```
+
+Descreva em linguagem natural a rotina que deseja testar apos o comando. O agente ira interpretar a descricao e gerar os scripts TestSuite, TestGroup e TestCase correspondentes.
+
+## Opcoes
+
+| Flag | Descricao | Padrao |
+|------|-----------|--------|
+| `--type` | Tipo de rotina: `mvc`, `execauto`, `report`, `processing`, `webservice`, `smartview`, `message`, `smartlink`, `routine-prep` | Auto-detectar a partir da descricao |
+| `--output` | Caminho de saida do arquivo `.prw` gerado | Diretorio atual |
+
+## Tipos de Rotina
+
+| Tipo | O que gera |
+|------|------------|
+| `mvc` | TestSuite/TestGroup/TestCase para rotinas MVC (ModelDef/ViewDef) com CRUD completo |
+| `execauto` | Testes de automacao via ExecAuto para notas fiscais, movimentos e lancamentos |
+| `report` | Testes de geracao de relatorios TReport com filtros e validacao de saida |
+| `processing` | Testes de processamento em batch com validacao de atualizacao de registros |
+| `webservice` | Testes de endpoints REST/SOAP com validacao de request, response e status HTTP |
+| `smartview` | Testes de dashboards e queries do Smart View |
+| `message` | Testes de integracao via TOTVS Message (fila de mensagens) |
+| `smartlink` | Testes de integracao via SmartLink com sistemas externos |
+| `routine-prep` | Preparacao de ambiente e dados para suporte a outros TestSuites |
+
+## Processo
+
+1. **Detectar tipo** — Identificar o `--type` informado ou inferir automaticamente a partir da descricao da rotina
+2. **Carregar referencia base** — Ler `skills/advpr-test-automation/reference.md` e `skills/advpr-test-automation/best-practices.md`
+3. **Carregar padrao correspondente** — Ler o arquivo `patterns-*` mapeado ao tipo detectado e tambem `skills/advpr-test-automation/api-fwtesthelper.md`
+4. **Delegar ao agente `code-generator`** — Gerar os fontes respeitando:
+   - Nome da classe com no maximo 25 caracteres (sem a extensao `.prw`); o nome do arquivo `.prw` deve ser identico ao nome da classe
+   - Estrutura hierarquica obrigatoria: TestSuite acima de TestGroup acima de TestCase
+   - Uso correto dos metodos `FWTestHelper` conforme `api-fwtesthelper.md`
+   - Proibicoes de boas praticas: sem `Sleep`, sem acesso direto a tabelas do Protheus via alias dentro do TestCase, sem asserts dentro de Setup/TearDown, sem dependencia de ordem entre TestCases
+
+### Mapeamento de --type para arquivo de padrao
+
+| Tipo | Arquivo de padrao |
+|------|-------------------|
+| `mvc` | `patterns-mvc.md` |
+| `execauto` | `patterns-execauto.md` |
+| `routine-prep` | `patterns-routine-prep.md` |
+| `report` | `patterns-reports.md` |
+| `processing` | `patterns-processing.md` |
+| `message` | `patterns-totvs-message.md` |
+| `webservice` | `patterns-webservice.md` |
+| `smartlink` | `patterns-smartlink.md` |
+| `smartview` | `patterns-smartview.md` |
+
+## Exemplos
+
+```bash
+# Gerar testes para rotina MVC de pedidos de venda
+/advpl-specialist:advpr --type mvc
+Rotina MVC MATA410 - Pedidos de Venda. Testar inclusao, alteracao e exclusao de pedido.
+
+# Gerar testes para ExecAuto de nota fiscal de saida
+/advpl-specialist:advpr --type execauto
+Automacao da MATA461 via ExecAuto para emissao de NF-e de saida.
+
+# Gerar testes para relatorio TReport
+/advpl-specialist:advpr --type report
+Relatorio de posicao de estoque MATA230 com filtros por filial, produto e data.
+
+# Gerar testes para webservice REST
+/advpl-specialist:advpr --type webservice
+Endpoint REST de consulta de saldo de estoque.
+
+# Gerar testes para processamento em batch
+/advpl-specialist:advpr --type processing
+Processamento em batch da rotina FINA080 que atualiza titulos em aberto.
+
+# Inferir tipo automaticamente
+/advpl-specialist:advpr
+Preciso testar o processamento em batch da rotina FINA080 que atualiza titulos em aberto.
+
+# Salvar em caminho especifico
+/advpl-specialist:advpr --type mvc --output tests/MATA410Suite.prw
+```
+
+## Saida
+
+Um arquivo `.prw` completo e compilavel contendo:
+
+- Classe TestSuite com configuracao de ambiente (Setup/TearDown)
+- Um ou mais TestGroups agrupando cenarios relacionados
+- TestCases individuais com assercoes via `FWTestHelper`
+- Nomes de classe e arquivo respeitando o limite de 25 caracteres
+- Comentarios Protheus.doc em cada metodo
+- Pronto para compilacao e execucao no ambiente ADVPR

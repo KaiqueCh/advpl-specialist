@@ -1,0 +1,211 @@
+---
+title: ADVPR Test Automation
+description: Automacao de testes sem interface no Protheus com o robo ADVPR (Advanced Protheus Robot) e a classe FWTestHelper
+---
+
+# ADVPR Test Automation
+
+ADVPR (Advanced Protheus Robot) e a ferramenta oficial de automacao de testes do Protheus, desenvolvida internamente em ADVPL. Ela permite automatizar casos de teste **sem uso de interface grafica**, com foco em regra de negocio — eliminando a dependencia de telas e tornando a execucao mais rapida, estavel e paralelizavel.
+
+> O comando `/advpl-specialist:advpr` gera scripts de automacao ADVPR seguindo os padroes desta skill automaticamente.
+
+## O que e o ADVPR
+
+- Executa testes de regra de negocio sem interface, em tempo menor que ferramentas baseadas em UI.
+- Roda em paralelo com outras atividades na mesma maquina.
+- Utiliza ADVPL, linguagem familiar aos desenvolvedores TOTVS.
+- Funciona em diferentes versoes do Protheus e e independente de alteracoes no ERP pela TOTVSTec/Framework.
+- Requer a aplicacao do patch de Setup disponivel em `http://advpr.totvs.com.br:8080/#/setup`.
+
+## Execucao
+
+### Com interface — FWMyTestRunner
+
+Apos aplicar o patch, execute o robo pela funcao `FWMyTestRunner` inserida no programa inicial do SmartClient. A tela exibe os casos de teste habilitados (esquerda) e os detalhes de cada execucao (direita). O resultado e indicado por legenda: verde para aprovado, vermelho para reprovado.
+
+### Headless (sem interface) — FwExecSuite
+
+A execucao oficial (esteira SmartTest) e sempre sem interface. Qualquer tela, alerta ou pergunta durante a execucao causa TimeOut e interrompe a suite.
+
+```
+appserver.exe -run=FwExecSuite -env=<environment> <suite> 0
+```
+
+Exemplo para a rotina MATA103:
+
+```
+C:\P12\P12\Bin\appserver\appserver.exe -run=FwExecSuite -env=P12 MATA103 0
+```
+
+Acompanhe a execucao pela Console do Servidor.
+
+**Causas de TimeOut:** execucao superior a 8 horas, apresentacao de interface, Access Violation ou falha ao gerar o resultado final.
+
+## Estrutura do Script
+
+A automacao consiste em tres fontes que se relacionam hierarquicamente:
+
+```
+TestSuite  →  agrupa um ou mais TestGroups
+  └── TestGroup  →  agrupa um ou mais TestCases
+        └── TestCase  →  implementa os casos de teste individuais
+```
+
+| Fonte | Herda de | Responsabilidade |
+|---|---|---|
+| TestSuite | `FWDefaultTestSuite` | Configuracao de pre-condicoes globais (ambiente, parametros, filial) |
+| TestGroup | `FWDefaultTestSuite` | Agrupamento e ordenacao dos TestCases |
+| TestCase | `FWDefaultTestCase` | Implementacao de cada caso de teste conforme especificacao |
+
+### Exemplo minimo — TestSuite
+
+```c
+#Include "TOTVS.CH"
+
+CLASS FINA040TestSuite FROM FWDefaultTestSuite
+  DATA aParam
+  METHOD FINA040TestSuite() CONSTRUCTOR
+  METHOD SetUpSuite()
+  METHOD TearDownSuite()
+ENDCLASS
+
+METHOD FINA040TestSuite() CLASS FINA040TestSuite
+  _Super:FWDefaultTestSuite()
+  Self:AddTestSuite(FINA040TestGroup():FINA040TestGroup())
+Return
+
+METHOD SetUpSuite() CLASS FINA040TestSuite
+  Local oHelper := FWTestHelper():New()
+  oHelper:UTOpenFilial("T1","D MG 01 ")
+  oHelper:UTSetParam("MV_LOCALIZ","S",.T.)
+  oHelper:Activate()
+Return oHelper
+
+METHOD TearDownSuite() CLASS FINA040TestSuite
+  Local oHelper := FWTestHelper():New()
+  oHelper:UTRestParam(::aParam)
+  oHelper:UTCloseFilial()
+Return oHelper
+```
+
+### Exemplo minimo — TestCase
+
+```c
+#Include "TOTVS.CH"
+
+CLASS FINA040TestCase FROM FWDefaultTestCase
+  DATA oHelper
+  METHOD FINA040TestCase() CONSTRUCTOR
+  METHOD FIN040_001()
+ENDCLASS
+
+METHOD FINA040TestCase() CLASS FINA040TestCase
+  _Super:FWDefaultTestSuite()
+  ::AddTestMethod("FIN040_001",,"Inclusao de titulo")
+Return
+
+METHOD FIN040_001() CLASS FINA040TestCase
+  Local oHelper := FWTestHelper():New()
+  Private lMsErroAuto    := .F.
+  Private lAutoErrNoFile := .T.
+
+  oHelper:Activate()
+  oHelper:UTSetValue("aCab","E1_PREFIXO","AUT")
+  oHelper:UTSetValue("aCab","E1_VALOR",1000)
+  oHelper:UTCommitData({|x,y| FINA040(x,y)}, oHelper:GetaCab(), 3)
+  oHelper:UTCheckDB("SE1","E1_VALOR",1000)
+  oHelper:AssertTrue(oHelper:lOk,"")
+Return oHelper
+```
+
+## Regras de Nomenclatura
+
+| Regra | Detalhe |
+|---|---|
+| Tamanho da classe | Maximo de 25 caracteres (excluindo o sufixo `TestSuite`/`TestGroup`/`TestCase`) |
+| Nome do arquivo `.prw` | Deve ser identico ao nome da classe |
+| Nome do metodo de teste | Exatamente 10 caracteres com o numero do caso (ex.: `FIN040_001`) |
+| TestGroup e TestCase | Devem ter o mesmo nome do TestSuite; caso contrario, cadastrar todos os TestCases separadamente em "Donos de Programa" |
+
+## A Classe FWTestHelper
+
+`FWTestHelper` e o nucleo do framework ADVPR. Instancie com `FWTestHelper():New()` e ative com `oHelper:Activate()`. A referencia completa esta em `skills/advpr-test-automation/api-fwtesthelper.md` com aproximadamente 113 metodos organizados nos seguintes grupos:
+
+| Grupo | Exemplos de metodos |
+|---|---|
+| Ciclo de vida | `New`, `Activate`, `Deactivate` |
+| Assertivas | `AssertTrue`, `AssertFalse`, `AssertHelp` |
+| Parametros, filial e data | `UTSetParam`, `UTRestParam`, `UTOpenFilial`, `UTCloseFilial`, `ChangeFil`, `UTDateCurrent` |
+| Entrada de dados e execucao | `UTSetValue`, `UTAddLine`, `UTCommitData`, `UTChangePergunte`, `UTFindReg`, `UTSchedule` |
+| Consulta e validacao em base | `UTCheckDB`, `UTQueryDB`, `UTSelectDB`, `UTCountRows`, `UTClearDB`, `UTDeleteDB` |
+| Auditoria | `UTAuditField`, `UTAuditTable`, `UTCheckAudit` |
+| Webservice, REST e EAI | `UTSetAPI`, `UTGetWS`, `UTPostWS`, `UTPutWS`, `UTDeleteWS`, `UTClientWSDL`, `UTEAIActivate`, `UTVldEAI` |
+| SmartLink | `UTGetTenantID`, `UTExecSmtLink`, `UTVldSmtLink`, `UTSetConfigSendSmtLink` |
+| Smart View | `UTParamSmartView`, `UTGenerateSmartView`, `UTCompareSmartView`, `UTSchemaSmartView` |
+| NF-e e TSS | `GeraChvNfe`, `UTXMLReplace`, `UTXMLGETVALUE`, `UTExecPredecessor` |
+
+## Tipos de Rotina Suportados
+
+| Tipo de Rotina | Arquivo de Padrao |
+|---|---|
+| MVC (Model-View-Controller) | `patterns-mvc.md` |
+| ExecAuto / MSExecAuto | `patterns-execauto.md` |
+| Preparacao de Rotina (desvio de tela) | `patterns-routine-prep.md` |
+| Relatorios | `patterns-reports.md` |
+| Processamento em lote | `patterns-processing.md` |
+| TOTVS Message (EAI) | `patterns-totvs-message.md` |
+| Webservice (REST e SOAP) | `patterns-webservice.md` |
+| SmartLink | `patterns-smartlink.md` |
+| Smart View | `patterns-smartview.md` |
+
+## Boas Praticas
+
+### Proibicoes
+
+- **Variaveis Private, publicas e estaticas** nos scripts — podem impactar outros testes do projeto.
+- **Loops** (`While`/`DbSkip`, `For`/`Next`) — oneram a execucao.
+- **RecLock/MsUnLock** — terminantemente proibido; grava direto no banco sem avaliar regra de negocio.
+- **Comandos de banco direto**: `Select`, `RetSQLName`, `D_E_L_E_T_`, `ChangeQuery`, `DbUseArea`, `DbCloseArea`, `TCGenQry` fora dos metodos ADVPR designados.
+- **Posicionamento manual**: `DbSelectArea`, `DbSetOrder`, `DbSeek` — usar `UTFindReg` no lugar.
+- **PutMV** — nao alterar SXs diretamente; usar `UTSetParam` com `UTRestParam` na restauracao.
+- CHs de produto e strings de localizacao de arquivos nos fontes de teste.
+
+### Restauracoes Obrigatorias
+
+| O que foi alterado | Como restaurar |
+|---|---|
+| Parametros via `UTSetParam` | `UTRestParam` apos o commit |
+| Filial via `ChangeFil` | `ChangeFil` de volta para a filial do Setup |
+| Data base alterada manualmente | `dDataBase := DATE()` apos o commit |
+| SIGAMAT via `UTAlterSM0` | `UTRestSM0` |
+| SX3 via `UTAtuSX3` | `UTRestSX3` |
+| Compartilhamento via `UTUpdComp` | `UTRestComp` |
+| Registry via `UTSetRouteMock` | `UTRestRegistry` |
+
+> Para envio de mensagens, sempre use `help()` em vez de telas customizadas. Isso dispensa o uso de `IsBlind` para execucao automatica.
+
+## GPS de Testes
+
+O GPS de Testes e uma funcionalidade integrada ao ADVPR que indica quais suites e casos de teste passam por um determinado trecho de codigo, com base na ultima cobertura coletada. Util para identificar quais testes executar antes e apos uma alteracao, evitando colaterais indesejados.
+
+**Como usar:** informar o nome do programa (sem extensao), a linha inicial e a linha final. O resultado lista TestSuites, TestCases e TestMethods que cobrem aquelas linhas. Os dados podem ser exportados para `.csv`.
+
+## Arquivos de Suporte
+
+Esta skill inclui os seguintes arquivos de referencia:
+
+| Arquivo | Conteudo |
+|---|---|
+| `reference.md` | Conceito, execucao, estrutura dos tres fontes e nomenclatura |
+| `best-practices.md` | Proibicoes e restauracoes obrigatorias |
+| `api-fwtesthelper.md` | Referencia completa da classe FWTestHelper (~113 metodos) |
+| `patterns-mvc.md` | Padrao para rotinas MVC |
+| `patterns-execauto.md` | Padrao para ExecAuto/MSExecAuto |
+| `patterns-routine-prep.md` | Preparacao de rotinas com desvio de tela |
+| `patterns-reports.md` | Automacao de relatorios |
+| `patterns-processing.md` | Rotinas de processamento em lote |
+| `patterns-totvs-message.md` | Integracao TOTVS Message (EAI) |
+| `patterns-webservice.md` | Webservice REST e SOAP |
+| `patterns-smartlink.md` | SmartLink |
+| `patterns-smartview.md` | Smart View |
+| `gps-de-testes.md` | GPS de Testes — cobertura por trecho de codigo |

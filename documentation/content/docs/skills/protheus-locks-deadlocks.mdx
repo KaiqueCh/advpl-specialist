@@ -1,0 +1,237 @@
+---
+title: Protheus Locks & Deadlocks
+description: Semantica de locks (RecLock/MsUnlock/DBAccess), leaks, prevencao e diagnostico de deadlocks no Protheus
+---
+
+# Protheus Locks & Deadlocks
+
+O Protheus usa um modelo de lock **hibrido**: locks de registro no nivel de Workarea (`RecLock`/`MsUnlock`) coordenados pelo **DBAccess** sobre o banco de dados subjacente (PostgreSQL, MSSQL ou Oracle). Leaks de lock, deadlocks e contencao sao os problemas de producao mais frequentes. Esta skill documenta a semantica de lock, padroes de leak, regras de prevencao e procedimentos de diagnostico.
+
+## Quando Usar
+
+- Investigar erros "Registro bloqueado por usuario XYZ" em producao
+- Diagnosticar degradacao de performance sob carga concorrente
+- Revisar codigo que usa `RecLock`, `TCSqlExec` ou `BeginTran`
+- Projetar jobs batch que atualizam grandes volumes de dados
+- Suspeita de lock leak (lock persiste sem usuario ativo)
+- Suspeita de deadlock (duas operacoes bloqueando uma a outra)
+
+## Modelo de Lock Hibrido
+
+| API | Granularidade | Bloqueia Outros? | Liberacao | Uso Tipico |
+|-----|--------------|-----------------|-----------|------------|
+| `RecLock(alias, lInsert)` | Registro unico | Sim, ate `MsUnlock` | `MsUnlock()` / `MsUnlockAll()` / fim do processo | CRUD padrao, dispara gatilhos SX7 |
+| `SoftLock(alias)` | Registro unico (otimista) | Nao — retorna `.F.` se ja bloqueado | Automatica ao mover cursor | Batch onde espera e indesejada |
+| `LockByName(cName, lShared, lFile)` | Lock global nomeado | Sim (outros chamadores esperam) | `UnLockByName()` | Coordenacao a nivel de aplicacao |
+| `TCSqlExec(cQuery)` (DML) | Lock de transacao DB | Sim, durante transacao DB | Commit/rollback DB | Operacoes bulk sem gatilhos |
+| `BeginTran` / `EndTran` | Escopo multi-registro | Sim, todos os registros tocados | `EndTran` (commit) / `DisarmTransaction` (rollback) | Consistencia transacional |
+
+## Padroes de Prevencao
+
+### Regra de Ouro
+
+Todo `RecLock` deve ser pareado com `MsUnlock` em **todo** caminho de codigo, incluindo caminhos de erro. O unico jeito confiavel de garantir isso em ADVPL/TLPP e envolver o lock em `BEGIN SEQUENCE / RECOVER USING` e desbloquear nos dois ramos.
+
+### Padrao 1 — Atualizacao de Registro Unico com Recovery
+
+```c
+#Include "TOTVS.CH"
+
+User Function FlagCust(cCustCode, cLoja, cFlag)
+    Local lOk      := .F.
+    Local oError
+    Local aArea    := GetArea()
+    Local aAreaSA1 := SA1->(GetArea())
+    Local lLocked  := .F.
+
+    DbSelectArea("SA1")
+    SA1->(DbSetOrder(1))
+
+    BEGIN SEQUENCE
+        If !SA1->(DbSeek(xFilial("SA1") + cCustCode + cLoja))
+            Break
+        EndIf
+        If !RecLock("SA1", .F.)
+            Break
+        EndIf
+        lLocked := .T.
+        SA1->A1_XFLAG := cFlag
+        lOk := .T.
+    RECOVER USING oError
+        ConOut("[FlagCust] Error: " + oError:Description)
+    END SEQUENCE
+
+    // Unlock executado em AMBOS os caminhos (sucesso e erro)
+    If lLocked
+        SA1->(MsUnlock())
+    EndIf
+
+    SA1->(RestArea(aAreaSA1))
+    RestArea(aArea)
+Return lOk
+```
+
+O flag `lLocked` rastreia se `RecLock` teve sucesso — `MsUnlock` so e chamado se houver lock adquirido. O `RestArea` e o unlock ficam **fora** do `END SEQUENCE`, garantindo execucao.
+
+### Padrao 2 — Transacao Multi-Registro
+
+```c
+#Include "TOTVS.CH"
+
+User Function ApproveOrder(cOrderNum)
+    Local lOk        := .F.
+    Local oError
+    Local lLockedSC5 := .F.
+    Local lLockedSE1 := .F.
+
+    BeginTran()
+    BEGIN SEQUENCE
+        // Sempre bloquear na mesma ordem definida no projeto (ex: SC5 antes de SE1)
+        DbSelectArea("SC5")
+        SC5->(DbSetOrder(1))
+        If !SC5->(DbSeek(xFilial("SC5") + cOrderNum)) .Or. !RecLock("SC5", .F.)
+            Break
+        EndIf
+        lLockedSC5 := .T.
+        SC5->C5_XSTATUS := "AP"
+
+        DbSelectArea("SE1")
+        SE1->(DbSetOrder(1))
+        If !SE1->(DbSeek(xFilial("SE1") + cOrderNum)) .Or. !RecLock("SE1", .F.)
+            Break
+        EndIf
+        lLockedSE1 := .T.
+        SE1->E1_STATUS := "B"
+
+        lOk := .T.
+    RECOVER USING oError
+        ConOut("[ApproveOrder] Error: " + oError:Description)
+    END SEQUENCE
+
+    If lLockedSC5 ; SC5->(MsUnlock()) ; EndIf
+    If lLockedSE1 ; SE1->(MsUnlock()) ; EndIf
+
+    If lOk
+        EndTran()
+    Else
+        DisarmTransaction()
+    EndIf
+Return lOk
+```
+
+A **ordem de lock** deve ser consistente em todo o projeto (ex: alfabetica por alias). Documente a convencao e aplique em code review. As tabelas precisam ter `X2_TTS = Sim` para que a transacao funcione corretamente.
+
+### Padrao 3 — Batch com SoftLock (Nao Bloqueante)
+
+```c
+#Include "TOTVS.CH"
+
+User Function BatchProcess()
+    Local nProcessed := 0
+    Local nSkipped   := 0
+    Local aArea      := GetArea()
+
+    DbSelectArea("SE1")
+    SE1->(DbSetOrder(1))
+    SE1->(DbGoTop())
+
+    While !SE1->(Eof())
+        If SE1->E1_FILIAL == xFilial("SE1") .And. SE1->E1_STATUS == "A"
+            If SoftLock("SE1")
+                SE1->E1_STATUS := "B"
+                nProcessed++
+                // SoftLock liberado automaticamente no proximo DbSkip
+            Else
+                nSkipped++
+                // Registro bloqueado — pular e continuar
+            EndIf
+        EndIf
+        SE1->(DbSkip())
+    EndDo
+    RestArea(aArea)
+Return nProcessed
+```
+
+`SoftLock` retorna imediatamente e e liberado automaticamente ao mover o cursor — sem `MsUnlock` explicito. Registros pulados devem ser reprocessados em uma segunda passagem.
+
+## Padroes Comuns de Deadlock
+
+Um deadlock ocorre quando duas threads cada uma segura um lock que a outra precisa. O DBAccess detecta a maioria e aborta uma das operacoes.
+
+| Padrao | Causa | Correcao |
+|--------|-------|----------|
+| Ordem inversa de locks | Thread A bloqueia SA1 depois SE1; Thread B faz o inverso | Convencao de ordem de lock em todo o projeto |
+| Workarea + DML na mesma tabela | `RecLock("SA1")` ativo enquanto `TCSqlExec("UPDATE SA1...")` roda | Escolha um modelo por fluxo de trabalho |
+| Lock cascateante por trigger | SX7 dispara `Posicione` ou lock implicito sobre tabela ja bloqueada | Mantenha expressoes SX7 somente leitura e curtas |
+| Lock de longa duracao | `RecLock` mantido durante computacao lenta ou input do usuario | Compute primeiro; lock+escrita+unlock o mais rapido possivel |
+
+## Parametros de Sistema Relevantes
+
+| Parametro | Padrao | Proposito |
+|-----------|--------|----------|
+| `MV_TIMEOUT` | ~10 (seg) | Tempo que `RecLock` aguarda antes de retornar `.F.` |
+| `MV_LOCKMSG` | (msg sistema) | Mensagem customizada exibida ao usuario quando lock e negado |
+| `MV_TRYLOCK` | `.F.` | Se `.T.`, reintenta locks falhos automaticamente |
+| `MV_TLOCKR` | `3` | Numero de retentativas quando `MV_TRYLOCK` e `.T.` |
+
+Nao ajuste `MV_TIMEOUT` para mascarar leaks — corrija o leak.
+
+## Diagnostico
+
+### Passo 1 — Diferenciar Leak de Contencao
+
+- **Leak:** lock persiste sem usuario ativo ou apos desconexao. O mesmo registro fica bloqueado indefinidamente.
+- **Contencao:** multiplos usuarios competindo genuinamente pelo mesmo registro. Normal sob carga; o problema e a largura do escopo do lock.
+
+### Passo 2 — TopMemoStatus
+
+```c
+User Function DiagLocks()
+    MemoWrite("\\dba_locks.txt", TopMemoStatus())
+    ConOut("[DiagLocks] Snapshot do DBAccess gravado")
+Return Nil
+```
+
+Procure sessoes com locks mas sem atividade recente (leaks), sessoes segurando locks de multiplas tabelas (candidatos a deadlock) e locks com timestamp antigo (rotina lenta dentro do escopo de lock).
+
+### Passo 3 — Analise no Banco de Dados
+
+Para SQL Server, use `EXEC sp_who2` e `EXEC sp_lock` para sessoes bloqueantes. O deadlock graph fica em `sys.dm_xe_session_targets` com o evento `xml_deadlock_report`.
+
+Para PostgreSQL, consulte `pg_stat_activity` com `pg_blocking_pids()` e `pg_locks WHERE granted = false`.
+
+Para Oracle, consulte `v$lock` cruzando com `v$session` para identificar bloqueantes e bloqueados.
+
+### Encerrar uma Sessao (Ultimo Recurso)
+
+- MSSQL: `KILL` seguido do SPID
+- PostgreSQL: `SELECT pg_terminate_backend(pid)`
+- Oracle: `ALTER SYSTEM KILL SESSION` com sid e serial
+
+Sempre investigue a causa raiz primeiro. Encerrar a sessao libera o lock mas perde a transacao em andamento.
+
+### Rastreando uma Rotina com Leak
+
+Se voce identificou a rotina mas nao a linha, adicione logs temporarios antes e depois de `RecLock` e `MsUnlock`. Se o log exibir "RecLock adquirido" sem "MsUnlock executado", voce encontrou o caminho do leak.
+
+## Anti-Patterns — Referencia Rapida
+
+| Anti-Pattern | Risco | Correcao |
+|-------------|-------|----------|
+| `RecLock` sem `MsUnlock` em todo caminho | Lock leak | `BEGIN SEQUENCE / RECOVER` + unlock nos dois ramos |
+| `Return` entre lock e unlock | Lock leak | Reestruturar o fluxo |
+| Computacao longa dentro de `RecLock` | Contencao | Compute antes; lock+escrita+unlock rapido |
+| Multiplas tabelas bloqueadas em ordem inconsistente | Deadlock | Convencao de ordem de lock no projeto |
+| Misturar `RecLock` e `TCSqlExec` na mesma tabela | Deadlock | Escolha um modelo por fluxo |
+| `RecLock` dentro de expressao SX7 | Deadlock cascateante | Mantenha triggers somente leitura |
+| `MsUnlockAll()` dentro de transacao | Quebra atomicidade do `BeginTran` | Use `MsUnlock()` direcionado por alias |
+| Query de leitura sem `%nolock%` (MSSQL) | Leitura bloqueia em escritor | Adicione `WITH (%nolock%)` |
+| `BeginTran` sem `EndTran` / `DisarmTransaction` em todos os caminhos | Transacao aberta — impacto em todo o DB | Envolva com recovery |
+
+## Arquivos de Suporte
+
+| Arquivo | Conteudo |
+|---------|----------|
+| `skills/protheus-locks-deadlocks/reference.md` | Visao geral, APIs de lock, parametros de sistema, padroes de deadlock e checklist de diagnostico rapido |
+| `skills/protheus-locks-deadlocks/patterns-prevention.md` | Templates de codigo prontos para uso: single-record, multi-record transaction, SoftLock batch, LockByName e insert com GetSxeNum; checklist de refatoracao |
+| `skills/protheus-locks-deadlocks/diagnostics.md` | Arvore de decisao de diagnostico, uso de `TopMemoStatus`, queries SQL por banco (MSSQL / PostgreSQL / Oracle), configuracoes de DBAccess e checklist pos-incidente |

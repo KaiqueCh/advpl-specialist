@@ -1,6 +1,6 @@
 ---
 title: /sxgen
-description: Gera scripts de configuracao do dicionario de dados SX do Protheus - campos SX3, indices SIX, perguntas SX1, tabelas genericas SX5
+description: Gera scripts de configuracao do dicionario de dados SX do Protheus - tabelas SX2, campos SX3, indices SIX, grupos SXG, pastas SXA, perguntas SX1, tabelas genericas SX5, consultas SXB e gatilhos SX7
 ---
 
 # /advpl-specialist:sxgen
@@ -19,17 +19,22 @@ Descreva o que voce precisa em linguagem natural apos o comando. O agente ira an
 
 | Flag | Descricao | Padrao |
 |------|-----------|--------|
-| `--type` | Tipo SX: `sx3`, `six`, `sx1`, `sx5` | Auto-detectar a partir da descricao |
+| `--type` | Tipo SX: `sx2`, `sx3`, `six`, `sxg`, `sxa`, `sx1`, `sx5`, `sxb`, `sx7` | Auto-detectar a partir da descricao |
 | `--output` | Salvar script em arquivo | Exibir no chat |
 
 ## Tipos de Configuracao
 
 | Tipo | O que gera |
 |------|------------|
+| `sx2` | Mapeamento de tabelas (X2_ARQUIVO, X2_CHAVE, X2_PATH, X2_MODO) |
 | `sx3` | Definicoes de campos (X3_ARQUIVO, X3_CAMPO, X3_TIPO, etc.) + gatilhos SX7 |
 | `six` | Definicoes de indices (INDICE, ORDEM, CHAVE, NICKNAME) |
+| `sxg` | Grupos de campos / tamanhos padronizados (XG_GRUPO, XG_TAMANHO, XG_DECIMAL) |
+| `sxa` | Pastas de cadastro (XA_ALIAS, XA_ORDEM, XA_DESCRIC) |
 | `sx1` | Definicoes de perguntas de relatorio (X1_GRUPO, X1_PERGUNT, X1_TIPO) |
 | `sx5` | Entradas de tabela generica (X5_TABELA, X5_CHAVE, X5_DESCRI) |
+| `sxb` | Consultas padrao / lookups F3 (XB_ALIAS, XB_TIPO, XB_SEQ, XB_CHAVE) |
+| `sx7` | Gatilhos de campo (X7_CAMPO, X7_SEQUENC, X7_REGRA, X7_CDOMAIN) |
 
 ## Validacoes Automaticas
 

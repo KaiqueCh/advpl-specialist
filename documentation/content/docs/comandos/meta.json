@@ -12,6 +12,7 @@
     "refactor",
     "document",
     "changelog",
-    "sxgen"
+    "sxgen",
+    "advpr"
   ]
 }
