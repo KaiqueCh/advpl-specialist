@@ -2,15 +2,66 @@
 
 ## Overview
 
-Templates and validation rules for generating Protheus data dictionary configuration scripts. Covers SX3 (fields), SIX (indexes), SX1 (report questions), SX5 (generic tables), and SX7 (triggers).
+Templates and validation rules for generating Protheus data dictionary configuration scripts. Covers SX2 (table headers), SX3 (fields), SIX (indexes), SXG (field groups), SXA (form folders/tabs), SX1 (report questions), SX5 (generic tables), SXB (F3 lookup queries), and SX7 (triggers).
+
+> **For programmatic READ access** to the same dictionary at runtime (FW APIs, `Posicione`, `TamSx3`, etc.), see [`../protheus-reference/sx-dictionary.md`](../protheus-reference/sx-dictionary.md). This skill focuses on **generation/configuration scripts**.
 
 ## When to Use
 
+- Registering a new custom table (header)
 - Creating new custom fields for a table
 - Defining indexes for custom tables
+- Grouping related fields across tables (cross-table validation)
+- Organizing fields into folders/tabs in MVC forms
 - Setting up report parameter questions
 - Creating generic lookup tables
+- Configuring F3 standard query lookups
 - Configuring field triggers
+
+## SX2 — Table Header
+
+Defines the table itself: alias, physical name pattern, share mode, and access mode. **Must be created before** generating SX3 fields for a new custom table.
+
+### Required Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| X2_CHAVE | Table alias (3 chars) | ZA1 |
+| X2_PATH | Path (usually empty — uses default) | |
+| X2_ARQUIVO | Physical name pattern | ZA1990 |
+| X2_NOME | Description pt-BR | Ordens de Servico |
+| X2_NOMESPA | Description es | Ordenes de Servicio |
+| X2_NOMEENG | Description en | Service Orders |
+| X2_MODO | Share mode: C/E/M | C |
+| X2_MODOEMP | Share mode per company | C |
+| X2_MODOUN | Share mode per branch unit | C |
+| X2_TTS | Transaction table (Sim/Nao) | Sim |
+| X2_PYME | Available in PYME edition (Sim/Nao) | Sim |
+| X2_USROPER | User audit (Sim/Nao) | Sim |
+
+### Share Mode Reference
+
+| X2_MODO | Meaning | Use Case |
+|---------|---------|----------|
+| `C` | Compartilhado (Shared across all companies/branches) | Global lookup tables, parameters |
+| `E` | Exclusivo (Per branch) | Most transactional tables (SA1, SE1, SF2) |
+| `M` | Misto (Mixed — depends on X2_MODOEMP/X2_MODOUN) | Special multi-tenant cases |
+
+### Rules
+
+- Alias must be 3 uppercase chars; custom tables use `Z` prefix (`ZA1`–`ZZZ`, `Z01`–`Z99`).
+- Physical name (`X2_ARQUIVO`) is the **base name** before company/branch padding (e.g., `ZA1990`). At runtime, DBAccess appends company code to produce `ZA1990010`.
+- Use **`RetSqlName("ZA1")` at runtime** — never hardcode the physical name.
+- `X2_TTS = Sim` enables transaction control via `BeginTran/EndTran`. Required for any table modified inside `RecLock` blocks that need rollback.
+- For new custom tables: register SX2 first, then SX3 fields, then SIX indexes, then optional SXG/SXA/SXB/SX7.
+
+### Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| Forgetting SX2 before SX3 | DBAccess errors on field registration | Always create SX2 first |
+| Wrong `X2_MODO` for branch-specific data | Data leaks across branches OR queries return nothing | Use `E` for transactional, `C` for global |
+| Hardcoded physical name in queries | Breaks across environments | `RetSqlName("ZA1")` |
 
 ## SX3 — Field Definition
 
@@ -105,6 +156,90 @@ Templates and validation rules for generating Protheus data dictionary configura
 - Nickname must be unique within the table
 - Order must be sequential starting from 1
 
+## SXG — Field Groups
+
+Groups define a **shared size/decimals contract** across fields that must stay aligned (e.g., a customer code field that appears in SA1, SE1, SC5 must always have the same size everywhere). Changing the group propagates to all linked fields via the dictionary update tool.
+
+### Required Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| XG_GRUPO | Group code (3 chars / digits) | 033 |
+| XG_DESCRIC | Description pt-BR | Codigo do Cliente |
+| XG_DESCSPA | Description es | Codigo del Cliente |
+| XG_DESCENG | Description en | Customer Code |
+| XG_TAMANHO | Size | 6 |
+| XG_DECIMAL | Decimals (for N) | 0 |
+| XG_PICTURE | Display format | @! |
+| XG_TIPO | Type: C, N, D, L, M | C |
+
+### Linking SX3 Fields to a Group
+
+In the SX3 row of every related field, populate `X3_GRUPO` with the group code:
+
+```
+X3_CAMPO   = A1_COD
+X3_GRUPO   = 033
+X3_TAMANHO = 6     (must match XG_TAMANHO)
+X3_TIPO    = C     (must match XG_TIPO)
+```
+
+### Rules
+
+- Group code: 3 chars (TOTVS uses numeric `001`–`999`; custom groups use `Z` prefix like `Z01`).
+- All SX3 fields with the same `X3_GRUPO` must agree on `X3_TIPO`, `X3_TAMANHO`, `X3_DECIMAL`, `X3_PICTURE`.
+- Use a group whenever the same logical field exists in 2+ tables (codes, foreign keys, totals).
+- The dictionary update tool (`UpdDistr`/`UPDDISTR`) uses SXG to propagate size changes — without a group, you must edit each SX3 row manually.
+
+### Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| Custom field references standard group, then group is resized by TOTVS update | Custom field silently grows — code that did `Substr(field, 1, 6)` may break | Use a custom Z-prefix group for custom fields |
+| SX3 size diverges from XG | Validation errors on insert | Keep SX3 in sync with XG, or remove the link |
+
+## SXA — Form Folders / Tabs
+
+Defines folders (tabs/abas) used to organize fields visually in MVC forms (`AxCadastro`, `MVCAxCadastro`, FormView). Without SXA registration, MVC views fall back to a single default tab.
+
+### Required Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| XA_ALIAS | Table alias | ZA1 |
+| XA_ORDEM | Folder order (2 digits) | 01 |
+| XA_DESCRIC | Folder name pt-BR | Cadastrais |
+| XA_DESCSPA | Folder name es | Generales |
+| XA_DESCENG | Folder name en | General |
+| XA_AGRUPCM | Visual grouping (optional) | |
+
+### Linking SX3 Fields to a Folder
+
+In each SX3 row, set `X3_FOLDER` to the desired folder order:
+
+```
+X3_CAMPO  = ZA1_CODIGO
+X3_FOLDER = 01            -- Goes in folder "Cadastrais"
+
+X3_CAMPO  = ZA1_OBSERV
+X3_FOLDER = 02            -- Goes in folder "Observacoes"
+```
+
+### Rules
+
+- Folder order must be sequential (01, 02, 03...) per table.
+- A field with empty `X3_FOLDER` falls back to folder 01.
+- Folder names appear translated based on the user's language (pt-BR / es / en).
+- For complex master-detail screens, combine SXA with `FWFormDetail` view configuration (the SXA defines folders; the View attaches grids to them).
+
+### Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| SXA registered but no `X3_FOLDER` populated | All fields land in default folder | Update SX3 rows with folder order |
+| Folder order skips numbers (01, 03) | UI may render unexpectedly | Keep sequential |
+| Translated names missing | Other locales show empty tab labels | Always fill all 3 description fields |
+
 ## SX1 — Report Questions
 
 ### Required Fields
@@ -151,6 +286,87 @@ Templates and validation rules for generating Protheus data dictionary configura
 - Table code: 2 uppercase characters (use Z prefix for custom: ZA, ZB, ZZ, etc.)
 - Key: 2 characters, sequential (01, 02, 03...)
 - To use in code: GetSX5("ZZ", "01") or X5DESCRI("ZZ", "01")
+
+## SXB — F3 Standard Query (Lookup)
+
+Defines the **F3 lookup window**: the dialog that opens when the user presses F3 on a field with `X3_F3` populated. Configures search columns, the result columns shown, and the value returned to the originating field. Composed of 4 row types (`XB_TIPO`): `1` = lookup definition, `2` = search index, `3` = display columns, `4` = return expression.
+
+### Required Fields (header / type 1)
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| XB_ALIAS | Lookup code (matches X3_F3) | SA1 |
+| XB_TIPO | Row type: 1, 2, 3, 4 | 1 |
+| XB_SEQ | Sequence (2 digits) | 01 |
+| XB_COLUNA | Column / order ref | DB |
+| XB_DESCRIC | Description pt-BR | Clientes |
+| XB_DESCSPA | Description es | Clientes |
+| XB_DESCENG | Description en | Customers |
+| XB_CONTEM | Content (key expression / field name) | SA1 |
+| XB_WCONTEM | When clause (optional) | |
+
+### Row Type Reference
+
+| XB_TIPO | Purpose | What goes in XB_CONTEM |
+|---------|---------|-----------------------|
+| `1` | Lookup header (one per alias) | Source table alias (e.g., `SA1`) |
+| `2` | Search index | Index order number to allow searching by (e.g., `1`, `3`) |
+| `3` | Display column in the lookup window | Field name (e.g., `A1_COD`, `A1_NOME`) |
+| `4` | Return expression — value passed back to the calling field | AdvPL expression (e.g., `SA1->A1_COD`) |
+
+### Example: Custom Lookup for SA1 by Name
+
+```
+-- Type 1: Header
+XB_ALIAS    = SACN  (custom 4-char code)
+XB_TIPO     = 1
+XB_SEQ      = 01
+XB_DESCRIC  = Clientes por Nome
+XB_CONTEM   = SA1
+
+-- Type 2: Search by index 3 (A1_FILIAL + A1_NOMECOM)
+XB_TIPO     = 2
+XB_SEQ      = 01
+XB_CONTEM   = 3
+
+-- Type 3: Show A1_COD, A1_LOJA, A1_NOME in the lookup grid
+XB_TIPO     = 3
+XB_SEQ      = 01
+XB_CONTEM   = A1_COD
+XB_TIPO     = 3
+XB_SEQ      = 02
+XB_CONTEM   = A1_LOJA
+XB_TIPO     = 3
+XB_SEQ      = 03
+XB_CONTEM   = A1_NOME
+
+-- Type 4: Return A1_COD to the calling field
+XB_TIPO     = 4
+XB_SEQ      = 01
+XB_CONTEM   = SA1->A1_COD
+```
+
+Then the calling field references it:
+```
+X3_F3 = SACN
+```
+
+### Rules
+
+- `XB_ALIAS` must match `X3_F3` exactly (often the table alias itself, but custom 4-char codes like `SACN` are valid for alternate lookups on the same table).
+- Always provide at least one type 1, one type 2, one type 3, and one type 4 — otherwise the lookup window will be incomplete.
+- Multiple type 2 rows allow the user to switch between search indexes (F12 in the lookup).
+- Multiple type 3 rows define the columns shown — order matters.
+- Type 4 expression must return a value compatible with the calling field's type/size.
+- Always include `D_E_L_E_T_ = ' '` filtering implicitly via the underlying index — SXB uses Workarea (`DbSeek`) under the hood, not raw SQL.
+
+### Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| `X3_F3` set but SXB not registered | F3 returns nothing | Register the lookup before referencing it |
+| Type 4 returns wrong type | Calling field gets garbage or error | Match return expression to field type |
+| Custom lookup not showing branch filter | Returns records from other branches | Use index that starts with FILIAL |
 
 ## SX7 — Triggers
 

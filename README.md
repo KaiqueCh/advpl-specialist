@@ -62,7 +62,7 @@ Repositorio: [https://github.com/thalysjuvenal/advpl-specialist](https://github.
 ### Para Consultores Funcionais
 
 - **Explicacao de codigo** - Nivel funcional: entenda customizacoes sem ler codigo
-- **Geracao de dicionario SX** - Descreva campos em linguagem natural e gere scripts SX3, SIX, SX1, SX5 e SX7
+- **Geracao de dicionario SX** - Descreva campos em linguagem natural e gere scripts SX2, SX3, SIX, SXG, SXA, SX1, SX5, SXB e SX7
 - **Changelog** - Documento de mudancas pronto para entregar ao cliente
 
 ## Instalacao
@@ -211,7 +211,7 @@ Os agents e commands carregam automaticamente bases de conhecimento internas (`s
 | `advpl-refactoring` | 6 padroes de refatoracao com before/after e regras de seguranca |
 | `documentation-patterns` | Templates para Protheus.doc header, documentacao completa e API REST |
 | `changelog-patterns` | Tipos de mudanca, niveis de impacto e formatos markdown/texto |
-| `sx-configuration` | Definicoes completas SX3/SIX/SX1/SX5/SX7 com validacoes e pictures |
+| `sx-configuration` | Definicoes completas SX2/SX3/SIX/SXG/SXA/SX1/SX5/SXB/SX7 com validacoes e pictures |
 | `tdn-lookup` | Estrategia de busca online no TDN via API REST do Confluence (4 tiers) |
 
 ## Estrutura do Projeto
@@ -250,7 +250,7 @@ advpl-specialist/
 │   ├── document.md
 │   ├── changelog.md
 │   └── sxgen.md
-├── skills/                        # 15 referencias internas (reference.md + supporting files)
+├── skills/                        # 16 referencias internas (reference.md + supporting files)
 │   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, TReport, FWFormBrowse, Jobs, Workflow
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao
 │   ├── advpl-debugging/           # Erros comuns e performance
@@ -259,6 +259,7 @@ advpl-specialist/
 │   ├── advpr-test-automation/     # Automacao de testes ADVPR: FWTestHelper, MVC, ExecAuto, relatorios, webservice, SmartLink, Smart View
 │   ├── protheus-business/         # 8 modulos ERP (COM, EST, FAT, FIN, CTB, FIS, PCP, MNT)
 │   ├── embedded-sql/              # BeginSQL/EndSQL, macros, patterns
+│   ├── query-builder/             # Decisao Workarea vs SQL, FWPreparedStatement, indices SIX, cross-DB
 │   ├── protheus-reference/        # 190+ funcoes nativas, SX, REST API, funcoes restritas
 │   ├── code-explanation/          # Explicacao de codigo com 3 niveis de audiencia
 │   ├── advpl-refactoring/         # 6 padroes de refatoracao com before/after
