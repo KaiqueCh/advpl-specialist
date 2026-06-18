@@ -6,6 +6,16 @@ Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-18
+
+### Added / Adicionado
+- New knowledge base `skills/query-builder/` — Workarea vs SQL decision, `FWPreparedStatement` parameter binding, SIX index awareness, and cross-database queries (PostgreSQL/MSSQL/Oracle). New knowledge base `skills/protheus-locks-deadlocks/` — lock semantics (`RecLock`/`MsUnlock`/DBAccess), lock-leak patterns, prevention rules (`BEGIN SEQUENCE`/`RECOVER`, `SoftLock`, transaction scoping) and deadlock diagnostics. Both registered in the documentation site.
+- Nova base de conhecimento `skills/query-builder/` — decisao Workarea vs SQL, binding de parametros com `FWPreparedStatement`, consciencia de indices SIX e queries cross-database (PostgreSQL/MSSQL/Oracle). Nova base de conhecimento `skills/protheus-locks-deadlocks/` — semantica de locks (`RecLock`/`MsUnlock`/DBAccess), padroes de leak, regras de prevencao (`BEGIN SEQUENCE`/`RECOVER`, `SoftLock`, escopo de transacao) e diagnostico de deadlocks. Ambas registradas no site de documentacao.
+
+### Changed / Alterado
+- `/advpl-specialist:sxgen` and the `sx-configuration` reference now also cover SX2 (table dictionary), SXG (field groups), SXA (folders) and SXB (F3 lookups), in addition to SX3/SIX/SX1/SX5/SX7.
+- `/advpl-specialist:sxgen` e a referencia `sx-configuration` agora cobrem tambem SX2 (dicionario de tabelas), SXG (grupos de campos), SXA (pastas) e SXB (consultas F3), alem de SX3/SIX/SX1/SX5/SX7.
+
 ## [1.2.0] - 2026-06-18
 
 ### Added / Adicionado

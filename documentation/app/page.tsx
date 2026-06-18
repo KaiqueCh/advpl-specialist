@@ -4,7 +4,7 @@ import { baseOptions } from '@/lib/layout.shared';
 
 // IMPORTANT: manter esta versao em sync com .claude-plugin/plugin.json .
 // validate-plugin.yml falha se este valor divergir de plugin.json.
-const PLUGIN_VERSION = 'v1.1.4';
+const PLUGIN_VERSION = 'v1.3.0';
 
 export default function Home() {
   return (
