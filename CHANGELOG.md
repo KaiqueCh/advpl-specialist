@@ -6,6 +6,12 @@ Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-18
+
+### Added / Adicionado
+- New knowledge base `skills/advpr-test-automation/` documenting the TOTVS internal tool ADVPR (Advanced Protheus Robot) for non-interface test automation: concept/execution, script structure (TestSuite/TestGroup/TestCase), best practices, the full `FWTestHelper` API reference, and pattern guides for MVC, ExecAuto, routine preparation, reports (TOTVS Report/R3/FWMSPrinter/Smart View), processing, TOTVS Message (EAI), Webservice (REST/SOAP/Portal) and SmartLink, plus the GPS de Testes coverage tool. New command `/advpl-specialist:advpr` generates ADVPR TestSuite/TestGroup/TestCase scripts.
+- Nova base de conhecimento `skills/advpr-test-automation/` documentando a ferramenta interna TOTVS ADVPR (Advanced Protheus Robot) para automacao de testes sem interface: conceito/execucao, estrutura de scripts (TestSuite/TestGroup/TestCase), boas praticas, a referencia completa da API `FWTestHelper`, e guias de padrao para MVC, ExecAuto, preparacao de rotina, relatorios (TOTVS Report/R3/FWMSPrinter/Smart View), processamento, Mensagem Unica (EAI), Webservice (REST/SOAP/Portal) e SmartLink, alem da ferramenta GPS de Testes. Novo comando `/advpl-specialist:advpr` gera scripts ADVPR TestSuite/TestGroup/TestCase.
+
 ## [1.1.4] - 2026-05-29
 
 ### Added / Adicionado

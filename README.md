@@ -123,6 +123,7 @@ Para uma experiencia completa, recomendamos instalar o plugin oficial **superpow
 | `/advpl-specialist:document` | Gerar documentacao tecnica automatica (header, full, api) |
 | `/advpl-specialist:changelog` | Gerar changelog formatado a partir do git diff |
 | `/advpl-specialist:sxgen` | Gerar scripts de dicionario SX a partir de descricao em linguagem natural |
+| `/advpl-specialist:advpr` | Gerar scripts de automacao de testes ADVPR (Advanced Protheus Robot) - TestSuite/TestGroup/TestCase para MVC, ExecAuto, relatorios, processamento, webservice, Smart View, TOTVS Message e SmartLink |
 
 ### Exemplos
 
@@ -159,6 +160,9 @@ Para uma experiencia completa, recomendamos instalar o plugin oficial **superpow
 
 # Gerar script de dicionario SX3
 /advpl-specialist:sxgen --type sx3
+
+# Gerar script de teste ADVPR para rotina MVC
+/advpl-specialist:advpr --type mvc "incluir prospect TMKA260"
 ```
 
 ## Exemplos
@@ -246,12 +250,13 @@ advpl-specialist/
 │   ├── document.md
 │   ├── changelog.md
 │   └── sxgen.md
-├── skills/                        # 14 referencias internas (reference.md + supporting files)
+├── skills/                        # 15 referencias internas (reference.md + supporting files)
 │   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, TReport, FWFormBrowse, Jobs, Workflow
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao
 │   ├── advpl-debugging/           # Erros comuns e performance
 │   ├── advpl-code-review/         # 24 regras de revisao de codigo
 │   ├── probat-testing/            # Testes unitarios ProBat (TLPP)
+│   ├── advpr-test-automation/     # Automacao de testes ADVPR: FWTestHelper, MVC, ExecAuto, relatorios, webservice, SmartLink, Smart View
 │   ├── protheus-business/         # 8 modulos ERP (COM, EST, FAT, FIN, CTB, FIS, PCP, MNT)
 │   ├── embedded-sql/              # BeginSQL/EndSQL, macros, patterns
 │   ├── protheus-reference/        # 190+ funcoes nativas, SX, REST API, funcoes restritas

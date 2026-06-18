@@ -287,6 +287,22 @@ oHelper:UTSetValue( "aItens", 'N3_TIPO', '01')
 oHelper:UTCommitData( { |x,y,z| ATFA010( x, y, z ) }, oHelper:GetaCab(), oHelper:GetaItens(), 3 )
 ```
 
+### GetaCab()
+Retorna o array de cabeçalho (`aCab`) preenchido via `UTSetValue("aCab",...)`, para passar como parâmetro ao `UTCommitData` nas execuções ExecAuto.
+
+Exemplo:
+```advpl
+oHelper:UTCommitData( {|a,b| MATA030(a,b)}, oHelper:GetaCab(), 3 )
+```
+
+### GetaItens()
+Retorna o array de itens (`aItens`) preenchido via `UTSetValue("aItens",...)`, para passar ao `UTCommitData` em ExecAuto com grid.
+
+Exemplo:
+```advpl
+oHelper:UTCommitData( {|x,y,z| MATA410(x,y,z)}, oHelper:GetaCab(), oHelper:GetaItens(), 3 )
+```
+
 ### UTChangePergunte( cGrupo, cOrdem, xValue )
 
 Altera o conteúdo das perguntas do SX1.
@@ -379,7 +395,9 @@ Procura e retorna o erro capturado pelo MsExecAuto / MVC.
 Local cErro := oHelper:UTGetError()
 ```
 
-### UtPutError( cError )
+### UTPutError( cError )
+
+O cabeçalho original do TDN grafa `UtPutError`.
 
 Inclui um erro manualmente no log do teste.
 
@@ -412,7 +430,13 @@ oHelper:UTSchedule("MATA320")
 
 ## Consulta e Validação em Base
 
-> **Nota sobre `UTFindReg`:** O método `UTFindReg` (posicionamento em tabela por índice e chave de pesquisa) é documentado na página de boas práticas do AdvPR como o método preferido para posicionamento em vez de `DbSeek` direto. Contudo, conforme a fonte oficial da classe `FWTestHelper` (TDN, id 272704378), ele **aparece apenas nos exemplos de `UTMarkReg`** e não possui uma entrada de método independente nesta classe — o que sugere que pode estar em uma versão diferente ou ser um método auxiliar interno. Para consultas e validações em base, utilize os métodos documentados abaixo: `UTQueryDB`, `UTCheckDB`, `UTSelectDB`, `UTRetReg`, `UTCountRows` e `UTContDB`.
+### UTFindReg( cAlias, nOrdem, cChave )
+Posiciona no registro da tabela/alias informado, usando a ordem do índice e a chave de busca. É o método ADVPR para posicionamento (use no lugar de `DbSeek`), usado em operações MVC de Alteração/Exclusão e antes de processar registros existentes.
+
+Exemplo:
+```advpl
+oHelper:UTFindReg( "SUS", 1, cCod + cLoja )
+```
 
 ### UTQueryDB( cTable, cField, cFilter, xValue, cFil )
 
