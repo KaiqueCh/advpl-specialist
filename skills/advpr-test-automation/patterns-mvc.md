@@ -312,10 +312,10 @@ As regras abaixo de `best-practices.md` têm aplicação direta em scripts MVC:
 
 **Proibições absolutas**
 
-- Gravação direta no banco via bloqueio de registro — terminantemente proibida (ver `best-practices.md` seção "Alteração direta no banco de dados"). Toda gravação deve passar por `UTCommitData`, que aciona o modelo MVC e respeita as regras de negócio.
-- Posicionamento manual via workarea — proibido. Use sempre `UTFindReg`, que encapsula o posicionamento de forma padronizada e auditável (ver `best-practices.md` seção "Posicionamento no banco de dados").
-- Queries diretas no banco (`Select`, `RetSQLName`, `D_E_L_E_T_` etc.) — proibidas nos scripts. A única forma válida de consultar dados para verificação é pelo método `UTQueryDB` (ver `best-practices.md` seção "Comandos de banco de dados").
-- Alteração direta de parâmetros SX6 — não usar funções de escrita direta em SX. Use `UTSetParam()` e sempre restaure com `UTRestParam()` após o commit (ver `best-practices.md` seção "Alteração de SXs").
+- Não use `RecLock`/`MsUnLock` (gravação direta no banco) — toda gravação deve passar por `UTCommitData()`, que aciona o modelo MVC e respeita as regras de negócio (ver `best-practices.md` seção "Alteração direta no banco de dados").
+- Não use `DbSeek` nem posicionamento manual no alias — use sempre `UTFindReg()`, que encapsula o posicionamento de forma padronizada e auditável (ver `best-practices.md` seção "Posicionamento no banco de dados").
+- Não use `Select`/`DbUseArea` para consultas de verificação — a única forma válida de consultar dados no script é o método `UTQueryDB()` (ver `best-practices.md` seção "Comandos de banco de dados").
+- Não use `PutMV` para alterar parâmetros SX6 — use `UTSetParam()` e sempre restaure com `UTRestParam()` após o commit (ver `best-practices.md` seção "Alteração de SXs").
 
 **Restauração de estado após o test case**
 
