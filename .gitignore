@@ -11,7 +11,11 @@ Thumbs.db
 
 # Project local files
 /docs/
+/totvs/
 linkedin-post.txt
+
+# Build artifacts
+*.tsbuildinfo
 
 # Playwright MCP
 .playwright-mcp/
