@@ -204,9 +204,12 @@ Os agents e commands carregam automaticamente bases de conhecimento internas (`s
 | `advpl-debugging` | Top 50 erros comuns, metodologia de debug, dicas de performance |
 | `advpl-code-review` | 24 regras de revisao de codigo (boas praticas, performance, seguranca, modernizacao) |
 | `probat-testing` | Framework ProBat para testes unitarios TLPP (annotations, assertions, patterns) |
+| `advpr-test-automation` | Automacao de testes ADVPR (FWTestHelper): TestSuite/Group/Case, MVC, ExecAuto, relatorios, webservice, SmartLink, Smart View |
 | `protheus-reference` | 190+ funcoes nativas, dicionario SX, referencia REST API, funcoes FW*, lista de funcoes restritas |
 | `protheus-business` | 8 modulos ERP com tabelas, rotinas, parametros MV_* e integracoes |
 | `embedded-sql` | BeginSQL/EndSQL, macros %table%, %notDel%, %xfilial%, %exp%, column types |
+| `query-builder` | Decisao Workarea vs SQL, FWPreparedStatement, consciencia de indices SIX, queries cross-database |
+| `protheus-locks-deadlocks` | Semantica de locks (RecLock/MsUnlock/DBAccess), leaks, prevencao (BEGIN SEQUENCE/RECOVER, SoftLock) e diagnostico de deadlocks |
 | `code-explanation` | Metodologia de explicacao de codigo com 3 niveis de audiencia |
 | `advpl-refactoring` | 6 padroes de refatoracao com before/after e regras de seguranca |
 | `documentation-patterns` | Templates para Protheus.doc header, documentacao completa e API REST |
@@ -250,7 +253,7 @@ advpl-specialist/
 │   ├── document.md
 │   ├── changelog.md
 │   └── sxgen.md
-├── skills/                        # 16 referencias internas (reference.md + supporting files)
+├── skills/                        # 17 referencias internas (reference.md + supporting files)
 │   ├── advpl-code-generation/     # Padroes MVC, REST, SOAP, PE, TReport, FWFormBrowse, Jobs, Workflow
 │   ├── advpl-to-tlpp-migration/   # Regras e checklist de migracao
 │   ├── advpl-debugging/           # Erros comuns e performance
@@ -260,6 +263,7 @@ advpl-specialist/
 │   ├── protheus-business/         # 8 modulos ERP (COM, EST, FAT, FIN, CTB, FIS, PCP, MNT)
 │   ├── embedded-sql/              # BeginSQL/EndSQL, macros, patterns
 │   ├── query-builder/             # Decisao Workarea vs SQL, FWPreparedStatement, indices SIX, cross-DB
+│   ├── protheus-locks-deadlocks/  # Locks/deadlocks: semantica, leaks, prevencao e diagnostico
 │   ├── protheus-reference/        # 190+ funcoes nativas, SX, REST API, funcoes restritas
 │   ├── code-explanation/          # Explicacao de codigo com 3 niveis de audiencia
 │   ├── advpl-refactoring/         # 6 padroes de refatoracao com before/after
