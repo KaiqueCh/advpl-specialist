@@ -164,8 +164,7 @@ Define se será utilizada a data do sistema operacional (.T.) ou a data definida
 
 | Nome | Tipo | Descrição | Default | Obrigatório |
 |---|---|---|---|---|
-| .T. | Lógico | Utiliza a data corrente do sistema | | X |
-| .F. | Lógico | Utiliza a data que está no script | | |
+| lDataCorrente | Lógico | .T. = utiliza a data corrente do sistema; .F. = utiliza a data que está no script | .T. | X |
 
 ```advpl
 oHelper:UTDateCurrent(.T.) // Default .T.
@@ -539,6 +538,8 @@ Conta a quantidade de registros de uma determinada tabela.
 | cAlias | Caractere | Nome da tabela | X |
 | nCount | Numérico | Quantidade esperada | X |
 
+> **Nota de fidelidade:** O exemplo do fonte TDN chama `UTCheckDB` em vez de `UTContDB` (provável erro do fonte); a correção foi aplicada abaixo.
+
 ```advpl
 nRegister := oHelper:UTContDB( "SA1", 13 )
 ```
@@ -635,7 +636,7 @@ Adiciona o campo `S_T_A_M_P_` nas tabelas do Protheus.
 | Nome | Tipo | Descrição | Default | Obrigatório |
 |---|---|---|---|---|
 | aTables | Array | Lista com as tabelas a atualizar | | X |
-| lGroup | Lógico | Se .T., realiza `RetSqlName` na tabela | .T. | Opcional |
+| lGroup | Lógico | Se .T., realiza `RetSqlName` na tabela (o fonte TDN grafa `IGroup`) | .T. | Opcional |
 
 Retorno: `::lOK` indicando sucesso.
 
@@ -1249,6 +1250,8 @@ oHelper:UTParamSmartView("filialDe","M PR 02")
 
 Gera relatórios utilizando Smart View a partir do Objeto de Negócios e arquivo `.trp` compilado no repositório.
 
+> **Nota:** O exemplo do TDN chama `oHelper:UTSmartView(...)` (possível alias/nome legado); o nome canônico documentado é `UTGenerateSmartView`.
+
 | Nome | Tipo | Descrição | Default | Obrigatório |
 |---|---|---|---|---|
 | cReport | Caractere | Nome do relatório (mesmo nome do arquivo `.trp`, sem extensão) | | X |
@@ -1636,10 +1639,6 @@ oHelper:UTCreateFile("Conteúdo do arquivo","Nome.txt")
 ### UTNotDeleteRel()
 
 Não permite a exclusão dos arquivos `.rel` da pasta Spool.
-
-| Nome | Tipo | Descrição | Default | Obrigatório |
-|---|---|---|---|---|
-| lNotDeleteRel | Lógico | .T. = não exclui; .F. = permite exclusão | .T. | |
 
 ```advpl
 oHelper:UTNotDeleteRel()
