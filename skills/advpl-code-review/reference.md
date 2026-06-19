@@ -65,3 +65,4 @@ Each finding must include:
 - `rules-performance.md` - Performance rules with detection patterns and code examples
 - `rules-security.md` - Security rules with detection patterns and code examples
 - `rules-modernization.md` - Modernization rules with detection patterns and code examples
+- `sonarqube-rules-catalog.md` - Official TOTVS SonarQube ruleset for AdvPL/TLPP (groups G1-G5, all `CA`/`BG`/`CS` codes with severity, prohibited API, and required alternative). Tag findings with the canonical SonarQube code and map them to the internal `BP`/`PERF`/`SEC`/`MOD` IDs. Read it to align reviews with the official quality gate (`sonar-rules.engpro.totvs.com.br`).
